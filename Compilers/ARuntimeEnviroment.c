@@ -5,10 +5,10 @@
  *      Author: fabio & cristian
  */
 
-main(int  argc,  char *argv[]) {
-	Acode *instruction;
+main(int argc, char *argv[]) {
+	Acode *instruction;
 	start_abstract_machine();
-	while ((instruction   = &program[pc++]) ­ >opertor   != HALT)
+	while ((instruction = &program[pc++])->operator != HALT)
 		execute(instruction);
 	stop_abstract_machine();
 }
