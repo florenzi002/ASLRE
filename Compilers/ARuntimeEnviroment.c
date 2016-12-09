@@ -6,3 +6,6 @@
  */
 
 
+int main(int *argv[], int argc){
+	printf("Hello World!");
+}
