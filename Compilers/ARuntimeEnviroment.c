@@ -2,10 +2,13 @@
  * ARuntimeEnviroment.c
  *
  *  Created on: 09/dic/2016
- *      Author: fabio
+ *      Author: fabio & cristian
  */
 
-
-int main(int *argv[], int argc){
-	printf("Hello World!");
+main(int  argc,  char *argv[]) {
+	Acode *instruction;
+	start_abstract_machine();
+	while ((instruction   = &program[pc++]) ­ >opertor   != HALT)
+		execute(instruction);
+	stop_abstract_machine();
 }
