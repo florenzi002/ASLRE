@@ -9,6 +9,7 @@
 #define REDEF_H_
 
 #define NUMOPERANDS 3
+#define NULL -1
 
 typedef struct _acode{
 	Operator operator;

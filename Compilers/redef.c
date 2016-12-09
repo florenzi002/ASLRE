@@ -26,6 +26,7 @@ void start_abstract_machine()
 	pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
+	asize = ASEGMENT;
 	ostack = (Orecord**) newmem(sizeof(Orecord*) * OSEGMENT);
 	osize = OSEGMENT;
 	istack = (char*) newmem(ISEGMENT);

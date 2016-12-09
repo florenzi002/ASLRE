@@ -13,6 +13,7 @@ main(int argc, char *argv[]) {
 	while ((instruction = &program[pc++])­->operator != HALT)
 		execute(instruction);
 	stop_abstract_machine();
+	return;
 }
 
 
