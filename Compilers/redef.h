@@ -9,12 +9,18 @@
 #define REDEF_H_
 
 #define NUMOPERANDS 3
-#define NULL -1
 
 typedef struct _acode{
-	Operator operator;
-	Lexval operands[NUMOPERANDS];
+	/*Operator operator;
+	Lexval operands[NUMOPERANDS];*/
 } Acode;
+
+typedef enum {ATOM, VECTOR} Otype;
+typedef struct _orecord{
+	Otype type;
+	int size;
+	//Lexval instance;
+} Orecord;
 
 typedef struct _arecord {
 	int objects;
@@ -23,12 +29,7 @@ typedef struct _arecord {
 	struct _arecord *al;
 } Arecord;
 
-typedef enum {ATOM, VECTOR} Otype;
-typedef struct _orecord{
-	Otype type;
-	int size;
-	Lexval instance;
-} Orecord;
+
 
 void start_abstract_machine();
 void stop_abstract_machine();
