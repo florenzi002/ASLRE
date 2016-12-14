@@ -39,14 +39,25 @@ int ap, op, ip;
 long allocated = 0, deallocated = 0;
 
 void load_acode(){
-	FILE* file = fopen(code_file_name, 'r');
+
+	FILE *file = fopen("./my_program.txt", "r");
+	if (file != NULL)
+	{
+	    printf("Ok");
+	    fclose(file);
+	}
+	else {
+		printf("KO");
+	}
+	/**
+	printf("pippo");
 	char line[256];
 	while (fgets(line, sizeof(line), file)) {
 		printf("%s", line);
 		//TODO creare ACODE struct
 	}
-	//TODO gestione eof vs. ioerror
-	fclose(file);
+	//TODO gestione eof vs. ioerror */
+	//fclose(file);
 }
 
 void start_abstract_machine()

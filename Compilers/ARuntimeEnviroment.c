@@ -5,14 +5,15 @@
  *      Author: fabio & cristian
  */
 
-#include "redef.h";
+#include "redef.h"
 
-main(int argc, char *argv[]) {
-	Acode *instruction;
+int main(int argc, char *argv[]) {
+	//Acode *instruction;
 	start_abstract_machine();
 	/*while ((instruction = &program[pc++])­->operator != HALT)
 		execute(instruction);
 	stop_abstract_machine();*/
+	return 0;
 }
 
 
