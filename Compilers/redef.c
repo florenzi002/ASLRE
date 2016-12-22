@@ -45,81 +45,18 @@ long allocated = 0, deallocated = 0;
  * un array
  */
 void load_acode(){
-	int lines_allocated = 128;
-	/* Alloca la memoria per ciascuna linea del file */
-	char **lines = (char **)malloc(sizeof(char*)*lines_allocated);
-	if (lines==NULL)
-	{
-		fprintf(stderr,"Out of memory (1).\n");
-		exit(1);
-	}
-
-	// Apro il file specificato dal percorso in modalità lettura
 	FILE *file = fopen("./my_program.txt", "r");
-	if (file != NULL)
-	{
-		int i;
-		for (i=0;1;i++)
-		{
-			int j;
-
-			// Verifico se eccedo la memoria allocata per le linee del file
-			if (i >= lines_allocated)
-			{
-				int new_size;
-
-				/* Effettuo nuovamente l'allocazione, raddoppiandola */
-				new_size = lines_allocated*2;
-				lines = (char **)realloc(lines,sizeof(char*)*new_size);
-				if (lines==NULL)
-				{
-					fprintf(stderr,"Out of memory(3).\n");
-					exit(3);
-				}
-				lines_allocated = new_size;
-				}
-		        /* Alloca la memoria necessaria per la linea successiva */
-		        lines[i] = malloc(LINEDIM);
-		        if (lines[i]==NULL)
-				{
-		            fprintf(stderr,"Out of memory (4).\n");
-		            exit(4);
-				}
-		        if (fgets(lines[i],LINEDIM-1,file)==NULL)
-		            break;
-
-		        /* Get rid of CR or LF at end of line */
-		        for (j=strlen(lines[i])-1;j>=0 && (lines[i][j]=='\n' || lines[i][j]=='\r');j--)
-		            ;
-		        lines[i][j+1]='\0';
-		        }
-		    /* Close file */
-		    fclose(file);
-
-		    int j;
-		    // Stampa le righe del file
-		    for(j = 0; j < i; j++)
-		        printf("%s\n", lines[j]);
-
-		    /* Libera la memoria */
-		    for (;i>=0;i--)
-		        free(lines[i]);
-		    free(lines);
-		    fclose(file);
+	char str[LINEDIM];
+	if(file != NULL){
+		fgets(str, sizeof(str), file);
+		char *last = strrchr(str, ' ');
+		if(last==NULL){
+			printf("Error loading code.");
+			exit(1);
+		}
+		Acode code[atoi(last+1)];
 	}
-	else { // File non trovato
-		fprintf(stderr,"A-Code File not found (2).\n");
-		exit(2);
-	}
-	/**
-	printf("pippo");
-	char line[256];
-	while (fgets(line, sizeof(line), file)) {
-		printf("%s", line);
-		//TODO creare ACODE struct
-	}
-	//TODO gestione eof vs. ioerror */
-	//fclose(file);
+	fclose(file);
 }
 
 void start_abstract_machine()
@@ -249,4 +186,4 @@ void execute_adef(int size)
 	po->type = ATOM;
 	po->size = size;
 }
-*/
+ */
