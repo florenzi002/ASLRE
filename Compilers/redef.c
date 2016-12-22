@@ -75,7 +75,7 @@ void execute_adef(int);
 Arecord *top_astack();
 
 Acode *program;
-int pc;
+int pc, code_size;
 Arecord **astack;
 Orecord **ostack;
 char *istack;
@@ -99,13 +99,13 @@ void load_acode(){
 			printf("Error loading code.");
 			exit(1);
 		}
-		Acode code[atoi(last+1)];
+		code_size = atoi(last+1);
+		program = malloc(code_size*sizeof(Acode));
 		char* line;
 		int p = 0;
 		while(!feof(file)){
 			fgets(str, sizeof(str), file);
 			line = strtok(str, " ");
-			printf("%s", line);
 			if(line == NULL){
 				printf("Error loading code.");
 				exit(1);
@@ -113,8 +113,8 @@ void load_acode(){
 			for(int i=0; i<(sizeof(s_op_code)/sizeof(void*)); i++){
 				if(strcmp(line,s_op_code[i])==0){
 					Acode *instruction = malloc(sizeof(Acode));
-					//instruction->operator = Operator[i];
-					//code[p++] = instruction;
+					instruction->operator = i;
+					program[p++] = *instruction;
 				}
 			}
 		}
@@ -125,6 +125,10 @@ void load_acode(){
 void start_abstract_machine()
 {
 	load_acode();
+	int i;
+	for(i=0; i<code_size; i++){
+		printf("%s\n", s_op_code[program[i].operator]);
+	}
 	/*pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
