@@ -11,46 +11,46 @@
 #include "redef.h"
 
 char* s_op_code[] = {
-    "ACODE",
-    "PUSH",
-    "JUMP",
-    "APOP",
-    "HALT",
-    "ADEF",
-    "SDEF",
-    "LOAD",
-    "PACK",
-    "LODA",
-    "IXAD",
-    "AIND",
-    "SIND",
-    "STOR",
-    "ISTO",
-    "SKIP",
-    "SKPF",
-    "EQUA",
-    "NEQU",
-    "IGRT",
-    "IGEQ",
-    "ILET",
-    "ILEQ",
-    "SGRT",
-    "SGEQ",
-    "SLET",
-    "SLEQ",
-    "ADDI",
-    "SUBI",
-    "MULI",
-    "DIVI",
-    "UMIN",
-    "NEGA",
-    "READ",
-    "WRIT",
-    "MODL",
-    "RETN",
-    "LOCS",
-    "LOCI",
-    "NOOP"
+		"ACODE",
+		"PUSH",
+		"JUMP",
+		"APOP",
+		"HALT",
+		"ADEF",
+		"SDEF",
+		"LOAD",
+		"PACK",
+		"LODA",
+		"IXAD",
+		"AIND",
+		"SIND",
+		"STOR",
+		"ISTO",
+		"SKIP",
+		"SKPF",
+		"EQUA",
+		"NEQU",
+		"IGRT",
+		"IGEQ",
+		"ILET",
+		"ILEQ",
+		"SGRT",
+		"SGEQ",
+		"SLET",
+		"SLEQ",
+		"ADDI",
+		"SUBI",
+		"MULI",
+		"DIVI",
+		"UMIN",
+		"NEGA",
+		"READ",
+		"WRIT",
+		"MODL",
+		"RETN",
+		"LOCS",
+		"LOCI",
+		"NOOP"
 };
 
 
@@ -94,6 +94,7 @@ void load_acode(){
 	char str[LINEDIM];
 	if(file != NULL){
 		fgets(str, sizeof(str), file);
+		//printf("\t%s\n", str);
 		char *last = strrchr(str, ' ');
 		if(last==NULL){
 			printf("Error loading code.");
@@ -105,16 +106,21 @@ void load_acode(){
 		int p = 0;
 		while(!feof(file)){
 			fgets(str, sizeof(str), file);
+			int str_len = strlen(str);
+			str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
 			line = strtok(str, " ");
 			if(line == NULL){
 				printf("Error loading code.");
 				exit(1);
 			}
-			for(int i=0; i<(sizeof(s_op_code)/sizeof(void*)); i++){
+			int i;
+			for(i=0; i<(sizeof(s_op_code)/sizeof(char*)); i++){
 				if(strcmp(line,s_op_code[i])==0){
 					Acode *instruction = malloc(sizeof(Acode));
 					instruction->operator = i;
+					//TODO load operandi
 					program[p++] = *instruction;
+
 				}
 			}
 		}
