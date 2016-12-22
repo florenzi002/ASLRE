@@ -54,8 +54,8 @@ typedef enum {
 } Operator;
 
 typedef struct _acode{
-	/*Operator operator;
-	Lexval operands[NUMOPERANDS];*/
+	Operator operator;
+	//Lexval operands[NUMOPERANDS];
 } Acode;
 
 typedef enum {ATOM, VECTOR} Otype;

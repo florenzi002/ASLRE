@@ -7,7 +7,52 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "redef.h"
+
+char* s_op_code[] = {
+    "ACODE",
+    "PUSH",
+    "JUMP",
+    "APOP",
+    "HALT",
+    "ADEF",
+    "SDEF",
+    "LOAD",
+    "PACK",
+    "LODA",
+    "IXAD",
+    "AIND",
+    "SIND",
+    "STOR",
+    "ISTO",
+    "SKIP",
+    "SKPF",
+    "EQUA",
+    "NEQU",
+    "IGRT",
+    "IGEQ",
+    "ILET",
+    "ILEQ",
+    "SGRT",
+    "SGEQ",
+    "SLET",
+    "SLEQ",
+    "ADDI",
+    "SUBI",
+    "MULI",
+    "DIVI",
+    "UMIN",
+    "NEGA",
+    "READ",
+    "WRIT",
+    "MODL",
+    "RETN",
+    "LOCS",
+    "LOCI",
+    "NOOP"
+};
+
 
 const int ASEGMENT = 10;
 const int OSEGMENT = 10;
@@ -55,6 +100,24 @@ void load_acode(){
 			exit(1);
 		}
 		Acode code[atoi(last+1)];
+		char* line;
+		int p = 0;
+		while(!feof(file)){
+			fgets(str, sizeof(str), file);
+			line = strtok(str, " ");
+			printf("%s", line);
+			if(line == NULL){
+				printf("Error loading code.");
+				exit(1);
+			}
+			for(int i=0; i<(sizeof(s_op_code)/sizeof(void*)); i++){
+				if(strcmp(line,s_op_code[i])==0){
+					Acode *instruction = malloc(sizeof(Acode));
+					//instruction->operator = Operator[i];
+					//code[p++] = instruction;
+				}
+			}
+		}
 	}
 	fclose(file);
 }
