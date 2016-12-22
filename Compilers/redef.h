@@ -10,6 +10,49 @@
 
 #define NUMOPERANDS 3
 
+typedef enum {
+    ACODE,
+    PUSH,
+    JUMP,
+    APOP,
+    HALT,
+    ADEF,
+    SDEF,
+    LOAD,
+    PACK,
+    LODA,
+    IXAD,
+    AIND,
+    SIND,
+    STOR,
+    ISTO,
+    SKIP,
+    SKPF,
+    EQUA,
+    NEQU,
+    IGRT,
+    IGEQ,
+    ILET,
+    ILEQ,
+    SGRT,
+    SGEQ,
+    SLET,
+    SLEQ,
+    ADDI,
+    SUBI,
+    MULI,
+    DIVI,
+    UMIN,
+    NEGA,
+    READ,
+    WRIT,
+    MODL,
+    RETN,
+    LOCS,
+    LOCI,
+    NOOP
+} Operator;
+
 typedef struct _acode{
 	/*Operator operator;
 	Lexval operands[NUMOPERANDS];*/
