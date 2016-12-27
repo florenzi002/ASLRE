@@ -169,6 +169,7 @@ void start_abstract_machine()
 	for(i=0; i<code_size; i++){
 		printf("%s\n", s_op_code[program[i].operator]);
 		printf("%d\n", program[i].operands[0].ival);
+
 		/**
 		if(program[i].operands[0] == NULL) {
 			printf("Primo operando nullo\n");
