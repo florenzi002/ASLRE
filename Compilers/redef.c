@@ -125,33 +125,18 @@ void load_acode(){
 				if(strcmp(line,s_op_code[i])==0){
 					Acode *instruction = malloc(sizeof(Acode));
 					instruction->operator = i;
-					int j;
-					/**
-					for(j=0; j<NUMOPERANDS; j++) {
-						instruction -> operands[j] = NULL;
-					}*/
-
-					//TODO load operandi
-					j=0;
+					int j = 0;
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
-
-					    //printf("Dentro\n");
 					    Value lexval = instruction->operands[j];
 					    if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
-					    	//lexval.sval = line;
 					    	instruction -> operands[j].sval = line;
 					    }
 					    else {
-					    	//lexval.ival = atoi(line);
 					    	instruction -> operands[j].ival = atoi(line);
-					    	//printf("%d\n", instruction -> operands[j].ival);
-					    }
+					     }
 					    line = strtok(NULL, " ");
 					    j++;
-					    //printf("%d\n", lexval.ival);
-
-					  //  instruction -> operands[j] = *lexval;
 					}
 					program[p++] = *instruction;
 					break;
@@ -167,16 +152,13 @@ void start_abstract_machine()
 	load_acode();
 	int i;
 	for(i=0; i<code_size; i++){
-		printf("%s\n", s_op_code[program[i].operator]);
-		printf("%d\n", program[i].operands[0].ival);
-
 		/**
-		if(program[i].operands[0] == NULL) {
-			printf("Primo operando nullo\n");
-		}
-		else {
+		printf("%s\n", s_op_code[program[i].operator]);
+		printf("Primo operando: %d\n", program[i].operands[0].ival);
+		printf("Secondo operando: %d\n", program[i].operands[1].ival);
+		printf("Terzo operando: %d\n", program[i].operands[2].ival);
+		printf("\n\n"); */
 
-		} */
 	}
 	/*pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
