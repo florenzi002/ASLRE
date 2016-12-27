@@ -90,24 +90,31 @@ long allocated = 0, deallocated = 0;
  * un array
  */
 void load_acode(){
+	// Apertura in lettura del file con l'Acode
 	FILE *file = fopen("./my_program.txt", "r");
 	char str[LINEDIM];
+	// Controllo se il puntatore a file e' nullo
 	if(file != NULL){
+		// Recupero la prima riga del file, che serve a sapere il numero di linee del file con l'Acode
 		fgets(str, sizeof(str), file);
-		//printf("\t%s\n", str);
 		char *last = strrchr(str, ' ');
 		if(last==NULL){
 			printf("Error loading code.");
 			exit(1);
 		}
 		code_size = atoi(last+1);
+		// Alloco la memoria necessaria a 'program', che e' un array di Acode, dove l'Acode e' la singola riga del file
 		program = malloc(code_size*sizeof(Acode));
 		char* line;
 		int p = 0;
+		// Leggo il file riga per riga finche' non arrivo all'EOF
 		while(!feof(file)){
+			// Leggo una riga del file
 			fgets(str, sizeof(str), file);
 			int str_len = strlen(str);
+			// Sostituisco l'eventuale newline con il carattere di terminazione della stringa
 			str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
+			// Tokenizzo la stringa usando come separatore lo spazio
 			line = strtok(str, " ");
 			if(line == NULL){
 				printf("Error loading code.");
@@ -118,9 +125,33 @@ void load_acode(){
 				if(strcmp(line,s_op_code[i])==0){
 					Acode *instruction = malloc(sizeof(Acode));
 					instruction->operator = i;
+					int j;
+					/**
+					for(j=0; j<NUMOPERANDS; j++) {
+						instruction -> operands[j] = NULL;
+					}*/
+
 					//TODO load operandi
-					while (line) {
+					j=0;
+					line = strtok(NULL, " ");
+					while (line!=NULL) {
+
+					    //printf("Dentro\n");
+					    Value lexval = instruction->operands[j];
+					    if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
+					    	//lexval.sval = line;
+					    	instruction -> operands[j].sval = line;
+					    }
+					    else {
+					    	//lexval.ival = atoi(line);
+					    	instruction -> operands[j].ival = atoi(line);
+					    	//printf("%d\n", instruction -> operands[j].ival);
+					    }
 					    line = strtok(NULL, " ");
+					    j++;
+					    //printf("%d\n", lexval.ival);
+
+					  //  instruction -> operands[j] = *lexval;
 					}
 					program[p++] = *instruction;
 					break;
@@ -137,6 +168,14 @@ void start_abstract_machine()
 	int i;
 	for(i=0; i<code_size; i++){
 		printf("%s\n", s_op_code[program[i].operator]);
+		printf("%d\n", program[i].operands[0].ival);
+		/**
+		if(program[i].operands[0] == NULL) {
+			printf("Primo operando nullo\n");
+		}
+		else {
+
+		} */
 	}
 	/*pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);

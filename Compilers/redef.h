@@ -56,7 +56,7 @@ typedef enum {
 typedef union{
     int ival;
     char *sval;
-    enum {TRUE, FALSE} bval;
+  //enum {TRUE, FALSE} bval;
 
 } Value;
 
