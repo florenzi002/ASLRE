@@ -119,8 +119,11 @@ void load_acode(){
 					Acode *instruction = malloc(sizeof(Acode));
 					instruction->operator = i;
 					//TODO load operandi
+					while (line) {
+					    line = strtok(NULL, " ");
+					}
 					program[p++] = *instruction;
-
+					break;
 				}
 			}
 		}
