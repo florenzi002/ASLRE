@@ -53,9 +53,16 @@ typedef enum {
     NOOP
 } Operator;
 
+typedef union{
+    int ival;
+    char *sval;
+    enum {TRUE, FALSE} bval;
+
+} Value;
+
 typedef struct _acode{
 	Operator operator;
-	//Lexval operands[NUMOPERANDS];
+	Value operands[NUMOPERANDS];
 } Acode;
 
 typedef enum {ATOM, VECTOR} Otype;
