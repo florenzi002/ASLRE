@@ -83,6 +83,6 @@ typedef struct _arecord {
 
 void start_abstract_machine();
 void stop_abstract_machine();
-void execute(Acode);
+void execute(Acode *);
 
 #endif /* REDEF_H_ */

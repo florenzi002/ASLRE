@@ -10,6 +10,20 @@
 #include <string.h>
 #include "redef.h"
 
+void *newmem(int);
+void freemem(char *, int);
+Arecord *push_activation_record();
+void pop_activation_record();
+void execute_jump(int);
+void execute_skip(int);
+void execute_skpf(int);
+void execute_retn();
+void execute_addi();
+void execute_igrt();
+void execute_adef(int);
+Arecord *top_astack();
+void abstract_machine_error(char *);
+
 char* s_op_code[] = {
 		"ACODE",
 		"PUSH",
@@ -59,20 +73,6 @@ const int OSEGMENT = 10;
 const int ISEGMENT = 10;
 
 const int LINEDIM = 128;
-
-void *newmem(int);
-void freemem(char *, int);
-Arecord *push_activation_record();
-void pop_activation_record();
-//void execute(Acode *);
-void execute_jump(int);
-void execute_skip(int);
-void execute_skpf(int);
-void execute_retn();
-void execute_addi();
-void execute_igrt();
-void execute_adef(int);
-Arecord *top_astack();
 
 Acode *program;
 int pc, code_size;
@@ -196,7 +196,7 @@ void freemem(char *p, int size)
 	deallocated += size;
 }
 
-/*
+
 Arecord *push_activation_record()
 {
 	Arecord **full_astack;
@@ -224,7 +224,7 @@ void pop_activation_record()
 
 void execute(Acode *instruction)
 {
-	switch(instruction->operator)
+	/*switch(instruction->operator)
 	{
 	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case JUMP: execute_jump(instruction->operands[0].ival); break;
@@ -261,15 +261,14 @@ void execute(Acode *instruction)
 	case NEGA: execute_nega(); break;
 	case READ: execute_read(); break;
 	case MODL: execute_modl(): break;
-	case RETN: execute_retn(); break;
 	case NOOP: execute_noop(); break;
 	// TODO
 	case RETN: execute_retn(); break;
 	default: abstract_machine_error("Unknown operator"); break;
-	}
+	}*/
 }
 
-void execute_jump(int address)
+/*void execute_jump(int address)
 {
 	pc = address;
 }
@@ -314,8 +313,7 @@ void execute_adef(int size)
 	po = push_ostack();
 	po->type = ATOM;
 	po->size = size;
-}
- */
+}*/
 
 void abstract_machine_error(char* error){
 	printf("%s\n", error);

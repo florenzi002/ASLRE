@@ -7,11 +7,14 @@
 
 #include "redef.h"
 
+extern int pc;
+extern Acode *program;
+
 int main(int argc, char *argv[]) {
-	//Acode *instruction;
+	Acode *instruction;
 	start_abstract_machine();
-	/*while ((instruction = &program[pc++])­->operator != HALT)
-		execute(instruction);*/
+	while((instruction = &program[pc++])->operator != HALT)
+		execute(instruction);
 	stop_abstract_machine();
 	return 0;
 }
