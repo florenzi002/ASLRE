@@ -14,6 +14,7 @@ void *newmem(int);
 void freemem(char *, int);
 Arecord *push_activation_record();
 void pop_activation_record();
+void execute_push(int, int, int);
 void execute_jump(int);
 void execute_skip(int);
 void execute_skpf(int);
@@ -128,15 +129,15 @@ void load_acode(){
 					int j = 0;
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
-					    Value lexval = instruction->operands[j];
-					    if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
-					    	instruction -> operands[j].sval = line;
-					    }
-					    else {
-					    	instruction -> operands[j].ival = atoi(line);
-					     }
-					    line = strtok(NULL, " ");
-					    j++;
+						Value lexval = instruction->operands[j];
+						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
+							instruction -> operands[j].sval = line;
+						}
+						else {
+							instruction -> operands[j].ival = atoi(line);
+						}
+						line = strtok(NULL, " ");
+						j++;
 					}
 					program[p++] = *instruction;
 					break;
@@ -151,15 +152,6 @@ void start_abstract_machine()
 {
 	load_acode();
 	int i;
-	for(i=0; i<code_size; i++){
-/*
-		printf("%s\n", s_op_code[program[i].operator]);
-		printf("Primo operando: %d\n", program[i].operands[0].ival);
-		printf("Secondo operando: %d\n", program[i].operands[1].ival);
-		printf("Terzo operando: %d\n", program[i].operands[2].ival);
-		printf("\n\n");
-*/
-	}
 	pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
@@ -196,6 +188,20 @@ void freemem(char *p, int size)
 	deallocated += size;
 }
 
+Orecord *push_ostack(){
+	Orecord **full_ostack;
+	int i;
+	if(op == osize)
+	{
+		full_ostack = ostack;
+		ostack = (Orecord**) newmem(sizeof(Orecord*) * (osize + OSEGMENT));
+		for(i = 0; i < osize; i++)
+			ostack[i] = full_ostack[i];
+		freemem((char*) full_ostack, sizeof(Orecord*) * osize);
+		osize += OSEGMENT;
+	}
+	return (ostack[op++] = (Orecord*) newmem(sizeof(Orecord)));
+}
 
 Arecord *push_activation_record()
 {
@@ -217,22 +223,22 @@ void pop_activation_record()
 {
 	if(ap == 0)
 		abstract_machine_error("Failure in popping activation record");
-	freemem((char*) astack[ap],
+	freemem((char*) astack[--ap],
 			sizeof(Arecord));
 }
 
-
 void execute(Acode *instruction)
 {
-	/*switch(instruction->operator)
+	printf("%d - %s\n", instruction->operator, s_op_code[instruction->operator]);
+	switch(instruction->operator)
 	{
-	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival); break;
+	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival, instruction->operands[2].ival); break;
 	case JUMP: execute_jump(instruction->operands[0].ival); break;
-	case APOP: execute_apop(); break;
-	case ADEF: execute_adef(instruction->operands[0].ival); break;
-	case SDEF: execute_sdef(instruction->operands[0].ival); break;
+	case APOP: pop_activation_record(); break;
+	/*case ADEF: execute_adef(instruction->operands[0].ival); break;
+	case SDEF: execute_sdef(instruction->operands[0].ival); break;*/
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
-	case LOCS: execute_locs(instruction->operands[0].sval); break;
+	/*case LOCS: execute_locs(instruction->operands[0].sval); break;
 	case LOAD: execute_load(); break;
 	case PACK: execute_pack(); break;
 	case LODA: execute_loda(); break;
@@ -252,9 +258,9 @@ void execute(Acode *instruction)
 	case SGRT: execute_sgrt(); break;
 	case SGEQ: execute_sgeeq(); break;
 	case SLET: execute_slet(); break;
-	case SLEQ: execute_sleq(); break;
+	case SLEQ: execute_sleq(); break;*/
 	case ADDI: execute_addi(); break;
-	case SUBI: execute_subbi(); break;
+	/*case SUBI: execute_subbi(); break;
 	case MULI: execute_muli(); break;
 	case DIVI: execute_divi(); break;
 	case UMIN: execute_umin(); break;
@@ -263,15 +269,29 @@ void execute(Acode *instruction)
 	case MODL: execute_modl(): break;
 	case NOOP: execute_noop(); break;
 	// TODO
-	case RETN: execute_retn(); break;
+	case RETN: execute_retn(); break;*/
 	default: abstract_machine_error("Unknown operator"); break;
-	}*/
+	}
 }
 
-/*void execute_jump(int address)
+void execute_push(int num_formals_aux, int num_loc, int chain){
+	Arecord *ar = push_activation_record();
+	ar->head = ostack[op-num_formals_aux];
+	ar->objects = num_loc;
+	ar->retad = pc+1;
+	if(chain<=0)
+		ar->al=NULL;
+}
+
+void execute_jump(int address)
 {
 	pc = address;
 }
+
+void execute_loci(int const_val){
+
+}
+/*
 void execute_skip(int offset)
 {
 	pc += offset-1;
@@ -289,23 +309,23 @@ void execute_retn()
 //TODO check update variable 'ap' after return
 Arecord* top_astack(){
 	return astack[ap];
-}
+}*/
 
 void execute_addi()
 {
 	int n, m;
-	n = pop_int();
+	/*n = pop_int();
 	m = pop_int();
-	push_int(m+n);
+	push_int(m+n);*/
 }
-
+/*
 void execute_igrt()
 {
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
-}
+}*/
 
 void execute_adef(int size)
 {
@@ -313,7 +333,7 @@ void execute_adef(int size)
 	po = push_ostack();
 	po->type = ATOM;
 	po->size = size;
-}*/
+}
 
 void abstract_machine_error(char* error){
 	printf("%s\n", error);
