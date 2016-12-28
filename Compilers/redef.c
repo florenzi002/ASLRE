@@ -152,23 +152,23 @@ void start_abstract_machine()
 	load_acode();
 	int i;
 	for(i=0; i<code_size; i++){
-		/**
+/*
 		printf("%s\n", s_op_code[program[i].operator]);
 		printf("Primo operando: %d\n", program[i].operands[0].ival);
 		printf("Secondo operando: %d\n", program[i].operands[1].ival);
 		printf("Terzo operando: %d\n", program[i].operands[2].ival);
-		printf("\n\n"); */
-
+		printf("\n\n");
+*/
 	}
-	/*pc = ap = op = ip = 0;
+	pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
 	ostack = (Orecord**) newmem(sizeof(Orecord*) * OSEGMENT);
 	osize = OSEGMENT;
 	istack = (char*) newmem(ISEGMENT);
-	isize = ISEGMENT;*/
+	isize = ISEGMENT;
 }
-/*
+
 void stop_abstract_machine()
 {
 	freemem((char*) program, sizeof(Acode) * code_size);
@@ -196,6 +196,7 @@ void freemem(char *p, int size)
 	deallocated += size;
 }
 
+/*
 Arecord *push_activation_record()
 {
 	Arecord **full_astack;
@@ -315,3 +316,8 @@ void execute_adef(int size)
 	po->size = size;
 }
  */
+
+void abstract_machine_error(char* error){
+	printf("%s\n", error);
+	exit(1);
+}
