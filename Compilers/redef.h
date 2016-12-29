@@ -66,6 +66,7 @@ typedef struct _acode{
 } Acode;
 
 typedef enum {ATOM, VECTOR} Otype;
+
 typedef struct _orecord{
 	Otype type;
 	int size;

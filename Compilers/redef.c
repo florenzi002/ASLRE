@@ -25,6 +25,8 @@ void execute_loci(int);
 void execute_store(int,int);
 void execute_adef(int);
 Arecord *top_astack();
+void print_ostack();
+void print_astack();
 void abstract_machine_error(char *);
 
 char* s_op_code[] = {
@@ -269,8 +271,8 @@ void execute(Acode *instruction)
 	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival, instruction->operands[2].ival); break;
 	case JUMP: execute_jump(instruction->operands[0].ival); break;
 	case APOP: pop_activation_record(); break;
-	/*case ADEF: execute_adef(instruction->operands[0].ival); break;
-	case SDEF: execute_sdef(instruction->operands[0].ival); break;*/
+	case ADEF: execute_adef(instruction->operands[0].ival); break;
+	//case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
 	/*case LOCS: execute_locs(instruction->operands[0].sval); break;
 	case LOAD: execute_load(); break;
@@ -309,13 +311,13 @@ void execute(Acode *instruction)
 }
 
 void execute_store(int chain, int oid) {
+	print_ostack();
 	Arecord* target_ar = astack[ap-1];
 	int i;
 	for(i=0; i<chain; i++) {
 		target_ar = target_ar->al;
 	}
 	Orecord *object = target_ar -> head + oid;
-	object -> instance.ival = istack[ip-1];
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
@@ -379,6 +381,26 @@ void execute_adef(int size)
 	po = push_ostack();
 	po->type = ATOM;
 	po->size = size;
+}
+
+void print_ostack(){
+	int i;
+	for(i=0; i<op; i++){
+		printf("%d\n", ostack[i]->type);
+	}
+}
+
+void print_astack() {
+    int i;
+    for(i=0; i<asize;i++) {
+     printf("Activation record n° %d\n",i);
+     printf("    ");
+     printf("Number of objects: %d\n", astack[i]->objects);
+     printf("    ");
+     printf("First object of this AR: %d\n", astack[i]->head->instance.ival);
+     printf("    ");
+     printf("Return address: %d\n", astack[i]->retad);
+    }
 }
 
 void abstract_machine_error(char* error){
