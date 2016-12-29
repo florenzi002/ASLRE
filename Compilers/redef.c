@@ -188,21 +188,6 @@ void freemem(char *p, int size)
 	deallocated += size;
 }
 
-Orecord *push_ostack(){
-	Orecord **full_ostack;
-	int i;
-	if(op == osize)
-	{
-		full_ostack = ostack;
-		ostack = (Orecord**) newmem(sizeof(Orecord*) * (osize + OSEGMENT));
-		for(i = 0; i < osize; i++)
-			ostack[i] = full_ostack[i];
-		freemem((char*) full_ostack, sizeof(Orecord*) * osize);
-		osize += OSEGMENT;
-	}
-	return (ostack[op++] = (Orecord*) newmem(sizeof(Orecord)));
-}
-
 Arecord *push_activation_record()
 {
 	Arecord **full_astack;
@@ -219,12 +204,59 @@ Arecord *push_activation_record()
 	return (astack[ap++] = (Arecord*) newmem(sizeof(Arecord)));
 }
 
+Orecord *push_ostack(){
+	Orecord **full_ostack;
+	int i;
+	if(op == osize)
+	{
+		full_ostack = ostack;
+		ostack = (Orecord**) newmem(sizeof(Orecord*) * (osize + OSEGMENT));
+		for(i = 0; i < osize; i++)
+			ostack[i] = full_ostack[i];
+		freemem((char*) full_ostack, sizeof(Orecord*) * osize);
+		osize += OSEGMENT;
+	}
+	return (ostack[op++] = (Orecord*) newmem(sizeof(Orecord)));
+}
+
+char *push_istack(){
+	char **full_istack;
+	int i;
+	if(ip == isize)
+	{
+		full_istack = istack;
+		istack = (char**) newmem(sizeof(char*) * (isize + ISEGMENT));
+		for(i = 0; i < isize; i++)
+			istack[i] = full_istack[i];
+		freemem((char*) full_istack, sizeof(char*) * isize);
+		isize += ISEGMENT;
+	}
+	return (ostack[ip++] = (char*) newmem(sizeof(char*)));
+}
+
+
 void pop_activation_record()
 {
 	if(ap == 0)
 		abstract_machine_error("Failure in popping activation record");
 	freemem((char*) astack[--ap],
 			sizeof(Arecord));
+}
+
+void pop_ostack()
+{
+	if(op == 0)
+		abstract_machine_error("Failure in popping object stack record");
+	freemem((char*) ostack[--op],
+			sizeof(Orecord));
+}
+
+void pop_istack()
+{
+	if(ip == 0)
+		abstract_machine_error("Failure in popping instance stack record");
+	freemem((char*) istack[--ip],
+			sizeof(char*));
 }
 
 void execute(Acode *instruction)
@@ -279,6 +311,7 @@ void execute_push(int num_formals_aux, int num_loc, int chain){
 	ar->head = ostack[op-num_formals_aux];
 	ar->objects = num_loc;
 	ar->retad = pc+1;
+	int i=0;
 	if(chain<=0)
 		ar->al=NULL;
 }
