@@ -21,6 +21,8 @@ void execute_skpf(int);
 void execute_retn();
 void execute_addi();
 void execute_igrt();
+void execute_loci(int);
+void execute_store(int,int);
 void execute_adef(int);
 Arecord *top_astack();
 void abstract_machine_error(char *);
@@ -276,9 +278,9 @@ void execute(Acode *instruction)
 	case LODA: execute_loda(); break;
 	case IXAD: execute_ixad(); break;
 	case AIND: execute_aind(); break;
-	case SIND: execute_sind(); break;
-	case STOR: execute_store(); break;
-	case ISTO: execute_isto(); break;
+	case SIND: execute_sind(); break; */
+	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
+	/*case ISTO: execute_isto(); break;
 	case SKIP: execute_skip(); break;
 	case SKPF: execute_skpf(); break;
 	case EQUA: execute_equa(); break;
@@ -306,6 +308,16 @@ void execute(Acode *instruction)
 	}
 }
 
+void execute_store(int chain, int oid) {
+	Arecord* target_ar = astack[ap-1];
+	int i;
+	for(i=0; i<chain; i++) {
+		target_ar = target_ar->al;
+	}
+	Orecord *object = target_ar -> head + oid;
+	object -> instance.ival = istack[ip-1];
+}
+
 void execute_push(int num_formals_aux, int num_loc, int chain){
 	Arecord *ar = push_activation_record();
 	ar->head = ostack[op-num_formals_aux];
@@ -322,7 +334,8 @@ void execute_jump(int address)
 }
 
 void execute_loci(int const_val){
-
+	push_istack();
+	istack[ip-1] = const_val;
 }
 /*
 void execute_skip(int offset)

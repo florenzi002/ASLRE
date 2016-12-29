@@ -69,7 +69,7 @@ typedef enum {ATOM, VECTOR} Otype;
 typedef struct _orecord{
 	Otype type;
 	int size;
-	//Lexval instance;
+	Value instance;
 } Orecord;
 
 typedef struct _arecord {
