@@ -75,7 +75,7 @@ typedef struct _orecord{
 
 typedef struct _arecord {
 	int objects;
-	Orecord *head;
+	Orecord **head;
 	int retad;
 	struct _arecord *al;
 } Arecord;

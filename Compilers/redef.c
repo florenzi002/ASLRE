@@ -22,6 +22,7 @@ void execute_retn();
 void execute_addi();
 void execute_igrt();
 void execute_loci(int);
+void execute_locs(char*);
 void execute_store(int,int);
 void execute_adef(int);
 Arecord *top_astack();
@@ -133,7 +134,6 @@ void load_acode(){
 					int j = 0;
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
-						Value lexval = instruction->operands[j];
 						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
 							instruction -> operands[j].sval = line;
 						}
@@ -224,18 +224,18 @@ Orecord *push_ostack(){
 }
 
 char *push_istack(){
-	char **full_istack;
+	char *full_istack;
 	int i;
 	if(ip == isize)
 	{
 		full_istack = istack;
-		istack = (char**) newmem(sizeof(char*) * (isize + ISEGMENT));
+		istack = (char*) newmem(sizeof(char*) * (isize + ISEGMENT));
 		for(i = 0; i < isize; i++)
 			istack[i] = full_istack[i];
 		freemem((char*) full_istack, sizeof(char*) * isize);
 		isize += ISEGMENT;
 	}
-	return (ostack[ip++] = (char*) newmem(sizeof(char*)));
+	return (istack[ip++] = (char*) newmem(sizeof(char*)));
 }
 
 
@@ -274,8 +274,8 @@ void execute(Acode *instruction)
 	case ADEF: execute_adef(instruction->operands[0].ival); break;
 	//case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
-	/*case LOCS: execute_locs(instruction->operands[0].sval); break;
-	case LOAD: execute_load(); break;
+	//case LOCS: execute_locs(instruction->operands[0].sval); break;
+	/*case LOAD: execute_load(); break;
 	case PACK: execute_pack(); break;
 	case LODA: execute_loda(); break;
 	case IXAD: execute_ixad(); break;
@@ -311,21 +311,21 @@ void execute(Acode *instruction)
 }
 
 void execute_store(int chain, int oid) {
-	print_ostack();
 	Arecord* target_ar = astack[ap-1];
 	int i;
 	for(i=0; i<chain; i++) {
 		target_ar = target_ar->al;
 	}
-	Orecord *object = target_ar -> head + oid;
+	Orecord** obj = target_ar->head + oid;
+	(*obj)->instance.ival = istack[ip-1];
+	print_astack();
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
 	Arecord *ar = push_activation_record();
-	ar->head = ostack[op-num_formals_aux];
+	ar->head = &ostack[op-num_formals_aux];
 	ar->objects = num_loc;
 	ar->retad = pc+1;
-	int i=0;
 	if(chain<=0)
 		ar->al=NULL;
 }
@@ -338,6 +338,10 @@ void execute_jump(int address)
 void execute_loci(int const_val){
 	push_istack();
 	istack[ip-1] = const_val;
+}
+
+void execute_locs(char* const_val){
+	push_istack();
 }
 /*
 void execute_skip(int offset)
@@ -362,9 +366,9 @@ Arecord* top_astack(){
 void execute_addi()
 {
 	int n, m;
-	/*n = pop_int();
+/*	n = pop_int();
 	m = pop_int();
-	push_int(m+n);*/
+	push_int(m+n); */
 }
 /*
 void execute_igrt()
@@ -385,19 +389,22 @@ void execute_adef(int size)
 
 void print_ostack(){
 	int i;
+	printf("# objects on ostack: %d\n", op);
 	for(i=0; i<op; i++){
-		printf("%d\n", ostack[i]->type);
+		printf("size of object: %d\n", ostack[i]->size);
 	}
 }
 
 void print_astack() {
     int i;
-    for(i=0; i<asize;i++) {
+    for(i=0; i<ap;i++) {
      printf("Activation record n° %d\n",i);
      printf("    ");
      printf("Number of objects: %d\n", astack[i]->objects);
      printf("    ");
-     printf("First object of this AR: %d\n", astack[i]->head->instance.ival);
+     printf("First object_size of this AR: %d\n", (*astack[i]->head)->size);
+     printf("    ");
+     printf("First object_ival of this AR: %d\n", (*astack[i]->head)->instance.ival);
      printf("    ");
      printf("Return address: %d\n", astack[i]->retad);
     }
