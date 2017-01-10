@@ -24,11 +24,20 @@ void execute_subi();
 void execute_muli();
 void execute_divi();
 void execute_igrt();
+void execute_igeq();
+void execute_ilet();
+void execute_ileq();
+void execute_sgrt();
+void execute_sgeq();
+void execute_slet();
+void execute_sleq();
 void execute_loci(int);
 void execute_locs(char*);
 void execute_store(int,int);
 void execute_adef(int);
 void execute_sdef(int);
+void execute_nega();
+void execute_umin();
 int pop_int();
 void push_int(int);
 Arecord *top_astack();
@@ -242,9 +251,27 @@ char *push_istack(){
 		freemem((char*) full_istack, sizeof(char*) * isize);
 		isize += ISEGMENT;
 	}
-	return (istack[ip++] = (char*) newmem(sizeof(char*)));
+	// Ritorno l'indirizzo all'ultimo elemento
+	return &(istack[ip++]);
 }
 
+/**
+ * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
+ * @param i il valore da assegnare
+ */
+void push_int(int i){
+	push_istack();
+	istack[ip-1] = i;
+}
+
+/**
+ * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
+ * @paramm i il valore da assegnare (0:falso, 1:true)
+ */
+void push_bool(int i) {
+	push_istack();
+	istack[ip-1] = i;
+}
 
 void pop_activation_record()
 {
@@ -289,13 +316,12 @@ void execute(Acode *instruction)
 	case AIND: execute_aind(); break;
 	case SIND: execute_sind(); break; */
 	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
-	/**
 	case IGRT: execute_igrt(); break;
 	case IGEQ: execute_igeq(); break;
 	case ILET: execute_ilet(); break;
 	case ILEQ: execute_ileq(); break;
 	case SGRT: execute_sgrt(); break;
-	case SGEQ: execute_sgeeq(); break;
+	case SGEQ: execute_sgeq(); break;
 	case SLET: execute_slet(); break;
 	case SLEQ: execute_sleq(); break;
 	/*case ISTO: execute_isto(); break;
@@ -308,10 +334,10 @@ void execute(Acode *instruction)
 	case SUBI: execute_subi(); break;
 	case MULI: execute_muli(); break;
 	case DIVI: execute_divi(); break;
-	/**
+
 	case UMIN: execute_umin(); break;
 	case NEGA: execute_nega(); break;
-	case READ: execute_read(); break;
+	/**case READ: execute_read(); break;
 	case MODL: execute_modl(): break;
 	case NOOP: execute_noop(); break;
 	// TODO
@@ -352,6 +378,21 @@ void execute_loci(int const_val){
 
 void execute_locs(char* const_val){
 	push_istack();
+}
+
+void execute_umin() {
+	int m = pop_int();
+	push_int(-m);
+}
+
+void execute_nega() {
+	int m = pop_int();
+	if(m==1) {
+		push_int(0);
+	}
+	else {
+		push_int(1);
+	}
 }
 /*
 void execute_skip(int offset)
@@ -414,14 +455,96 @@ void execute_divi()
 }
 
 
-/*
+/**
+ * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' maggiore del secondo.
+ * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ */
 void execute_igrt()
 {
+	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
-}*/
+	print_istack();
+}
+
+/**
+ * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' maggiore o uguale al secondo.
+ * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ */
+void execute_igeq()
+{
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m>=n);
+	print_istack();
+}
+
+/**
+ * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' minore del secondo.
+ * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ */
+void execute_ilet()
+{
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<n);
+	print_istack();
+}
+
+/**
+ * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' minore o uguale al secondo.
+ * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ */
+void execute_ileq() {
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<=n);
+	print_istack();
+}
+
+void execute_sgrt() {
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<=n);
+	print_istack();
+}
+
+void execute_sgeq() {
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<=n);
+	print_istack();
+}
+
+void execute_slet() {
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<=n);
+	print_istack();
+}
+
+void execute_sleq() {
+	print_istack();
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m<=n);
+	print_istack();
+}
 
 void execute_adef(int size)
 {
@@ -439,17 +562,12 @@ void execute_sdef(int size)
 	po->size = size;
 }
 
+
 int pop_int(){
 	int i = istack[ip-1];
 	pop_istack();
 	return i;
 }
-
-void push_int(int i){
-	push_istack();
-	istack[ip-1] = i;
-}
-
 
 void print_ostack(){
 	int i;
