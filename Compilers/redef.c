@@ -34,6 +34,7 @@ void push_int(int);
 Arecord *top_astack();
 void print_ostack();
 void print_astack();
+void print_istack();
 void abstract_machine_error(char *);
 
 char* s_op_code[] = {
@@ -288,11 +289,7 @@ void execute(Acode *instruction)
 	case AIND: execute_aind(); break;
 	case SIND: execute_sind(); break; */
 	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
-	/*case ISTO: execute_isto(); break;
-	case SKIP: execute_skip(); break;
-	case SKPF: execute_skpf(); break;
-	case EQUA: execute_equa(); break;
-	case NEQU: execute_nequ(); break;
+	/**
 	case IGRT: execute_igrt(); break;
 	case IGEQ: execute_igeq(); break;
 	case ILET: execute_ilet(); break;
@@ -300,11 +297,18 @@ void execute(Acode *instruction)
 	case SGRT: execute_sgrt(); break;
 	case SGEQ: execute_sgeeq(); break;
 	case SLET: execute_slet(); break;
-	case SLEQ: execute_sleq(); break;*/
+	case SLEQ: execute_sleq(); break;
+	/*case ISTO: execute_isto(); break;
+	case SKIP: execute_skip(); break;
+	case SKPF: execute_skpf(); break;
+	case EQUA: execute_equa(); break;
+	case NEQU: execute_nequ(); break;
+	*/
 	case ADDI: execute_addi(); break;
-	/*case SUBI: execute_subbi(); break;
+	case SUBI: execute_subi(); break;
 	case MULI: execute_muli(); break;
 	case DIVI: execute_divi(); break;
+	/**
 	case UMIN: execute_umin(); break;
 	case NEGA: execute_nega(); break;
 	case READ: execute_read(); break;
@@ -371,34 +375,42 @@ Arecord* top_astack(){
 
 void execute_addi()
 {
+	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m+n);
+	print_istack();
 }
 
 void execute_subi()
 {
+	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m-n);
+	print_istack();
 }
 
 void execute_muli()
 {
+	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m*n);
+	print_istack();
 }
 
 void execute_divi()
 {
+	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m/n);
+	print_istack();
 }
 
 
@@ -460,6 +472,15 @@ void print_astack() {
      printf("    ");
      printf("Return address: %d\n", astack[i]->retad);
     }
+}
+
+void print_istack() {
+	int i=0;
+	for(i=0; i<ip; i++) {
+		printf("Instance stack record n° %d\n", i);
+		printf("    ");
+		printf("Valore: %d\n", istack[i]);
+	}
 }
 
 void abstract_machine_error(char* error){
