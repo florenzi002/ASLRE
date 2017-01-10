@@ -20,11 +20,17 @@ void execute_skip(int);
 void execute_skpf(int);
 void execute_retn();
 void execute_addi();
+void execute_subi();
+void execute_muli();
+void execute_divi();
 void execute_igrt();
 void execute_loci(int);
 void execute_locs(char*);
 void execute_store(int,int);
 void execute_adef(int);
+void execute_sdef(int);
+int pop_int();
+void push_int(int);
 Arecord *top_astack();
 void print_ostack();
 void print_astack();
@@ -366,10 +372,36 @@ Arecord* top_astack(){
 void execute_addi()
 {
 	int n, m;
-/*	n = pop_int();
+	n = pop_int();
 	m = pop_int();
-	push_int(m+n); */
+	push_int(m+n);
 }
+
+void execute_subi()
+{
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_int(m-n);
+}
+
+void execute_muli()
+{
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_int(m*n);
+}
+
+void execute_divi()
+{
+	int n, m;
+	n = pop_int();
+	m = pop_int();
+	push_int(m/n);
+}
+
+
 /*
 void execute_igrt()
 {
@@ -386,6 +418,26 @@ void execute_adef(int size)
 	po->type = ATOM;
 	po->size = size;
 }
+
+void execute_sdef(int size)
+{
+	Orecord *po;
+	po = push_ostack();
+	po->type = VECTOR;
+	po->size = size;
+}
+
+int pop_int(){
+	int i = istack[ip-1];
+	pop_istack();
+	return i;
+}
+
+void push_int(int i){
+	push_istack();
+	istack[ip-1] = i;
+}
+
 
 void print_ostack(){
 	int i;
