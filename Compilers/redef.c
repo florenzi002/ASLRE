@@ -38,6 +38,8 @@ void execute_adef(int);
 void execute_sdef(int);
 void execute_nega();
 void execute_umin();
+void execute_nequ();
+void execute_equa();
 int pop_int();
 void push_int(int);
 Arecord *top_astack();
@@ -596,6 +598,34 @@ void execute_sdef(int size)
 	po = push_ostack();
 	po->type = VECTOR;
 	po->size = size;
+}
+
+/**
+ * Confronta due oggetti (operatore ==): se questi sono uguali, carica nell'instance stack il valore 1, altrimenti carica
+ * il valore 0
+ */
+void execute_equa()
+{
+	print_istack();
+	int n,m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m==n);
+	print_istack();
+}
+
+/**
+ * Confronta due oggetti (operatore !=): se questi sono diversi, carica nell'instance stack il valore 1, altrimenti carica
+ * il valore 0
+ */
+void execute_nequ()
+{
+	print_istack();
+	int n,m;
+	n = pop_int();
+	m = pop_int();
+	push_bool(m!=n);
+	print_istack();
 }
 
 
