@@ -9,6 +9,8 @@
 #define REDEF_H_
 
 #define NUMOPERANDS 3
+#define INTSIZE sizeof(int)
+
 
 typedef enum {
     ACODE,

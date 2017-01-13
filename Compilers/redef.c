@@ -151,7 +151,17 @@ void load_acode(){
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
 						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
-							instruction -> operands[j].sval = line;
+							char* string = (char*)malloc(sizeof(char)*(strlen(line)-1));
+							int counter = 0;
+							char c = *line;
+							while(c!='\0'){
+								if(c!='"'){
+									*(string+counter)=c;
+									c=*(line+(++counter));
+								}
+							}
+							*(string+(++counter))='\0';
+							instruction -> operands[j].sval = string;
 						}
 						else {
 							instruction -> operands[j].ival = atoi(line);
@@ -171,7 +181,6 @@ void load_acode(){
 void start_abstract_machine()
 {
 	load_acode();
-	int i;
 	pc = ap = op = ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
@@ -224,6 +233,13 @@ Arecord *push_activation_record()
 	return (astack[ap++] = (Arecord*) newmem(sizeof(Arecord)));
 }
 
+Arecord *top_astack(){
+	if (ap==0) {
+		abstract_machine_error("Failure accessing top of Activation Stack");
+	}
+	return astack[ap-1];
+}
+
 Orecord *push_ostack(){
 	Orecord **full_ostack;
 	int i;
@@ -255,13 +271,41 @@ char *push_istack(){
 	return &(istack[ip++]);
 }
 
+char *top_istack(){
+	if (ip==0) {
+		abstract_machine_error("Failure accessing top of Instance Stack");
+	}
+	return &(istack[ip-1]);
+}
+
+int is_endian(){
+	int i=1;
+	char *p = (char *)&i;
+	if(p[0]==1)
+		return 0;
+	return 1;
+}
+
 /**
  * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
  * @param i il valore da assegnare
  */
 void push_int(int i){
-	push_istack();
-	istack[ip-1] = i;
+	unsigned char *i_bytes=(unsigned char*)&i;
+	int p;
+	if(is_endian()){
+		p=0;
+		for(;p<INTSIZE;p++){
+			push_istack();
+			*top_istack()=i_bytes[p];
+		}
+	}else{
+		p=INTSIZE-1;
+		for(;p>=0;p--){
+			push_istack();
+			*top_istack()=i_bytes[p];
+		}
+	}
 }
 
 /**
@@ -293,8 +337,7 @@ void pop_istack()
 {
 	if(ip == 0)
 		abstract_machine_error("Failure in popping instance stack record");
-	freemem((char*) istack[--ip],
-			sizeof(char*));
+	istack[ip--]='\0';
 }
 
 void execute(Acode *instruction)
@@ -308,7 +351,7 @@ void execute(Acode *instruction)
 	case ADEF: execute_adef(instruction->operands[0].ival); break;
 	//case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
-	//case LOCS: execute_locs(instruction->operands[0].sval); break;
+	case LOCS: execute_locs(instruction->operands[0].sval); break;
 	/*case LOAD: execute_load(); break;
 	case PACK: execute_pack(); break;
 	case LODA: execute_loda(); break;
@@ -329,7 +372,7 @@ void execute(Acode *instruction)
 	case SKPF: execute_skpf(); break;
 	case EQUA: execute_equa(); break;
 	case NEQU: execute_nequ(); break;
-	*/
+	 */
 	case ADDI: execute_addi(); break;
 	case SUBI: execute_subi(); break;
 	case MULI: execute_muli(); break;
@@ -347,7 +390,7 @@ void execute(Acode *instruction)
 }
 
 void execute_store(int chain, int oid) {
-	Arecord* target_ar = astack[ap-1];
+	Arecord* target_ar = top_astack();
 	int i;
 	for(i=0; i<chain; i++) {
 		target_ar = target_ar->al;
@@ -359,28 +402,26 @@ void execute_store(int chain, int oid) {
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
 	Arecord *ar = push_activation_record();
-	ar->head = &ostack[op-num_formals_aux];
+	/*ar->head = &ostack[op-num_formals_aux];
 	ar->objects = num_loc;
 	ar->retad = pc+1;
 	if(chain<=0)
-		ar->al=NULL;
+		ar->al=NULL;*/
 }
 
-void execute_jump(int address)
-{
+void execute_jump(int address){
 	pc = address;
 }
 
 void execute_loci(int const_val){
-	push_istack();
-	istack[ip-1] = const_val;
+	push_int(const_val);
 }
 
 void execute_locs(char* const_val){
-	push_istack();
+
 }
 
-void execute_umin() {
+void execute_umin(){
 	int m = pop_int();
 	push_int(-m);
 }
@@ -394,6 +435,7 @@ void execute_nega() {
 		push_int(1);
 	}
 }
+
 /*
 void execute_skip(int offset)
 {
@@ -416,42 +458,36 @@ Arecord* top_astack(){
 
 void execute_addi()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m+n);
-	print_istack();
 }
 
 void execute_subi()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m-n);
-	print_istack();
 }
 
 void execute_muli()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m*n);
-	print_istack();
 }
 
 void execute_divi()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
+	if(n==0)
+		abstract_machine_error("Error: Divide by 0");
 	m = pop_int();
 	push_int(m/n);
-	print_istack();
 }
 
 
@@ -564,9 +600,14 @@ void execute_sdef(int size)
 
 
 int pop_int(){
-	int i = istack[ip-1];
-	pop_istack();
-	return i;
+	unsigned char i_bytes[INTSIZE];
+	int p = 0;
+	char *q = (top_istack());
+	for(;p<INTSIZE;p++){
+		i_bytes[p]=*(q--);
+		pop_istack();
+	}
+	return *(int *)i_bytes;
 }
 
 void print_ostack(){
@@ -578,18 +619,18 @@ void print_ostack(){
 }
 
 void print_astack() {
-    int i;
-    for(i=0; i<ap;i++) {
-     printf("Activation record n° %d\n",i);
-     printf("    ");
-     printf("Number of objects: %d\n", astack[i]->objects);
-     printf("    ");
-     printf("First object_size of this AR: %d\n", (*astack[i]->head)->size);
-     printf("    ");
-     printf("First object_ival of this AR: %d\n", (*astack[i]->head)->instance.ival);
-     printf("    ");
-     printf("Return address: %d\n", astack[i]->retad);
-    }
+	int i;
+	for(i=0; i<ap;i++) {
+		printf("Activation record n° %d\n",i);
+		printf("    ");
+		printf("Number of objects: %d\n", astack[i]->objects);
+		printf("    ");
+		printf("First object_size of this AR: %d\n", (*astack[i]->head)->size);
+		printf("    ");
+		printf("First object_ival of this AR: %d\n", (*astack[i]->head)->instance.ival);
+		printf("    ");
+		printf("Return address: %d\n", astack[i]->retad);
+	}
 }
 
 void print_istack() {
@@ -597,7 +638,7 @@ void print_istack() {
 	for(i=0; i<ip; i++) {
 		printf("Instance stack record n° %d\n", i);
 		printf("    ");
-		printf("Valore: %d\n", istack[i]);
+		printf("Valore: %02X\n", istack[i]);
 	}
 }
 
