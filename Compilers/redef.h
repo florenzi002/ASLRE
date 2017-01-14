@@ -10,6 +10,7 @@
 
 #define NUMOPERANDS 3
 #define INTSIZE sizeof(int)
+#define ENDIANESS endian()
 
 
 typedef enum {
@@ -54,6 +55,8 @@ typedef enum {
     LOCI,
     NOOP
 } Operator;
+
+enum {INTEGER, STRING};
 
 typedef union{
     int ival;

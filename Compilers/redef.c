@@ -40,13 +40,17 @@ void execute_nega();
 void execute_umin();
 void execute_nequ();
 void execute_equa();
+unsigned char *pop_n_istack(int);
+void pop_ostack();
 int pop_int();
 void push_int(int);
 Arecord *top_astack();
+Orecord *top_ostack();
+char *top_istack();
 void print_ostack();
 void print_astack();
 void print_istack();
-void abstract_machine_error(char *);
+void abstract_machine_Error(char *);
 
 char* s_op_code[] = {
 		"ACODE",
@@ -120,12 +124,11 @@ void load_acode(){
 	// Controllo se il puntatore a file e' nullo
 	if(file != NULL){
 		// Recupero la prima riga del file, che serve a sapere il numero di linee del file con l'Acode
-		fgets(str, sizeof(str), file);
+		if(fgets(str, sizeof(str), file)==NULL)
+			abstract_machine_Error("Error loading code");
 		char *last = strrchr(str, ' ');
-		if(last==NULL){
-			printf("Error loading code.");
-			exit(1);
-		}
+		if(last==NULL)
+			abstract_machine_Error("Error loading code");
 		code_size = atoi(last+1);
 		// Alloco la memoria necessaria a 'program', che e' un array di Acode, dove l'Acode e' la singola riga del file
 		program = malloc(code_size*sizeof(Acode));
@@ -134,16 +137,15 @@ void load_acode(){
 		// Leggo il file riga per riga finche' non arrivo all'EOF
 		while(!feof(file)){
 			// Leggo una riga del file
-			fgets(str, sizeof(str), file);
+			if(fgets(str, sizeof(str), file)==NULL)
+				abstract_machine_Error("Error loading code");
 			int str_len = strlen(str);
 			// Sostituisco l'eventuale newline con il carattere di terminazione della stringa
 			str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
 			// Tokenizzo la stringa usando come separatore lo spazio
 			line = strtok(str, " ");
-			if(line == NULL){
-				printf("Error loading code.");
-				exit(1);
-			}
+			if(line == NULL)
+				abstract_machine_Error("Error loading code");
 			int i;
 			for(i=0; i<(sizeof(s_op_code)/sizeof(char*)); i++){
 				if(strcmp(line,s_op_code[i])==0){
@@ -198,7 +200,7 @@ void stop_abstract_machine()
 	freemem((char*) astack, sizeof(Arecord*) * asize);
 	freemem((char*) ostack, sizeof(Orecord*) * osize);
 	freemem(istack, isize);
-	printf("Program executed without errors\n");
+	printf("Program executed without Errors\n");
 	printf("Allocation: %ld bytes\n", allocated);
 	printf("Deallocation: %ld bytes\n", deallocated);
 	printf("Residue: %ld bytes\n", allocated - deallocated);
@@ -208,7 +210,7 @@ void *newmem(int size)
 {
 	void *p;
 	if((p = malloc(size)) == NULL)
-		abstract_machine_error("Failure in memory allocation");
+		abstract_machine_Error("Failure in memory allocation");
 	allocated += size;
 	return p;
 }
@@ -237,7 +239,7 @@ Arecord *push_activation_record()
 
 Arecord *top_astack(){
 	if (ap==0) {
-		abstract_machine_error("Failure accessing top of Activation Stack");
+		abstract_machine_Error("Failure accessing top of Activation Stack");
 	}
 	return astack[ap-1];
 }
@@ -255,6 +257,13 @@ Orecord *push_ostack(){
 		osize += OSEGMENT;
 	}
 	return (ostack[op++] = (Orecord*) newmem(sizeof(Orecord)));
+}
+
+Orecord *top_ostack(){
+	if (op==0) {
+		abstract_machine_Error("Failure accessing top of Activation Stack");
+	}
+	return ostack[op-1];
 }
 
 char *push_istack(){
@@ -275,12 +284,12 @@ char *push_istack(){
 
 char *top_istack(){
 	if (ip==0) {
-		abstract_machine_error("Failure accessing top of Instance Stack");
+		abstract_machine_Error("Failure accessing top of Instance Stack");
 	}
 	return &(istack[ip-1]);
 }
 
-int is_endian(){
+int endian(){
 	int i=1;
 	char *p = (char *)&i;
 	if(p[0]==1)
@@ -293,9 +302,11 @@ int is_endian(){
  * @param i il valore da assegnare
  */
 void push_int(int i){
+	execute_adef(INTSIZE);
+	top_ostack()->instance.sval=&(istack[ip]);
 	unsigned char *i_bytes=(unsigned char*)&i;
 	int p;
-	if(is_endian()){
+	if(ENDIANESS){
 		p=0;
 		for(;p<INTSIZE;p++){
 			push_istack();
@@ -322,7 +333,7 @@ void push_bool(int i) {
 void pop_activation_record()
 {
 	if(ap == 0)
-		abstract_machine_error("Failure in popping activation record");
+		abstract_machine_Error("Failure in popping activation record");
 	freemem((char*) astack[--ap],
 			sizeof(Arecord));
 }
@@ -330,7 +341,7 @@ void pop_activation_record()
 void pop_ostack()
 {
 	if(op == 0)
-		abstract_machine_error("Failure in popping object stack record");
+		abstract_machine_Error("Failure in popping object stack record");
 	freemem((char*) ostack[--op],
 			sizeof(Orecord));
 }
@@ -338,8 +349,30 @@ void pop_ostack()
 void pop_istack()
 {
 	if(ip == 0)
-		abstract_machine_error("Failure in popping instance stack record");
-	istack[ip--]='\0';
+		abstract_machine_Error("Failure in popping instance stack record");
+	ip--;
+}
+
+unsigned char *pop_n_istack(int n){
+	unsigned char *i_bytes = malloc(n*sizeof(char));
+	int p = 0;
+	char *q = top_istack()+1-INTSIZE;
+	for(;p<INTSIZE;p++){
+		i_bytes[p]=*(q++);
+		pop_istack();
+	}
+	return i_bytes;
+}
+
+int pop_int(){
+	unsigned char *i_bytes = pop_n_istack(INTSIZE);
+	pop_ostack();
+	int i=0,q=INTSIZE-1,res=0;
+	for(;i<INTSIZE;i++){
+		res = res|(i_bytes[i])<<(q-i);
+	}
+	freemem((char *)i_bytes, INTSIZE);
+	return res;
 }
 
 void execute(Acode *instruction)
@@ -387,7 +420,7 @@ void execute(Acode *instruction)
 	case NOOP: execute_noop(); break;
 	// TODO
 	case RETN: execute_retn(); break;*/
-	default: abstract_machine_error("Unknown operator"); break;
+	default: abstract_machine_Error("Unknown operator"); break;
 	}
 }
 
@@ -397,18 +430,17 @@ void execute_store(int chain, int oid) {
 	for(i=0; i<chain; i++) {
 		target_ar = target_ar->al;
 	}
-	Orecord** obj = target_ar->head + oid;
-	(*obj)->instance.ival = istack[ip-1];
-	print_astack();
+	Orecord* p_obj = *(target_ar->head + oid);
+	p_obj->instance.ival=pop_int();
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
 	Arecord *ar = push_activation_record();
-	/*ar->head = &ostack[op-num_formals_aux];
-	ar->objects = num_loc;
+	ar->head = &ostack[op-num_formals_aux];
+	ar->objects = num_loc+num_formals_aux;
 	ar->retad = pc+1;
 	if(chain<=0)
-		ar->al=NULL;*/
+		ar->al=NULL;
 }
 
 void execute_jump(int address){
@@ -464,6 +496,8 @@ void execute_addi()
 	n = pop_int();
 	m = pop_int();
 	push_int(m+n);
+	print_ostack();
+	print_istack();
 }
 
 void execute_subi()
@@ -487,11 +521,10 @@ void execute_divi()
 	int n, m;
 	n = pop_int();
 	if(n==0)
-		abstract_machine_error("Error: Divide by 0");
+		abstract_machine_Error("Error: Divide by 0");
 	m = pop_int();
 	push_int(m/n);
 }
-
 
 /**
  * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' maggiore del secondo.
@@ -628,18 +661,6 @@ void execute_nequ()
 	print_istack();
 }
 
-
-int pop_int(){
-	unsigned char i_bytes[INTSIZE];
-	int p = 0;
-	char *q = (top_istack());
-	for(;p<INTSIZE;p++){
-		i_bytes[p]=*(q--);
-		pop_istack();
-	}
-	return *(int *)i_bytes;
-}
-
 void print_ostack(){
 	int i;
 	printf("# objects on ostack: %d\n", op);
@@ -672,7 +693,7 @@ void print_istack() {
 	}
 }
 
-void abstract_machine_error(char* error){
-	printf("%s\n", error);
+void abstract_machine_Error(char* Error){
+	printf("%s\n", Error);
 	exit(1);
 }
