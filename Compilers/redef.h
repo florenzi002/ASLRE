@@ -10,7 +10,7 @@
 
 #define NUMOPERANDS 3
 #define INTSIZE sizeof(int)
-#define ENDIANESS endian()
+#define PTRSIZE sizeof(void *)
 
 
 typedef enum {

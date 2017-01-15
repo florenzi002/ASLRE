@@ -50,7 +50,10 @@ char *top_istack();
 void print_ostack();
 void print_astack();
 void print_istack();
+int endian();
 void abstract_machine_Error(char *);
+
+#define ENDIANESS endian()
 
 char* s_op_code[] = {
 		"ACODE",
@@ -155,16 +158,17 @@ void load_acode(){
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
 						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
-							char* string = (char*)malloc(sizeof(char)*(strlen(line)-1));
-							int counter = 0;
+							char *string = (char*)malloc(sizeof(char)*(strlen(line)-1));
+							int counter, pos;
+							counter = pos = 0;
 							char c = *line;
 							while(c!='\0'){
 								if(c!='"'){
-									*(string+counter)=c;
-									c=*(line+(++counter));
+									string[pos++]=c;
 								}
+								c=*(line+(++counter));
 							}
-							*(string+(++counter))='\0';
+							string[++counter]='\0';
 							instruction -> operands[j].sval = string;
 						}
 						else {
@@ -184,8 +188,25 @@ void load_acode(){
 
 void start_abstract_machine()
 {
+	/*printf("ENDIANESS: %d\n",ENDIANESS);
+	//char c[] = "abc";
+	char *pc = (char*)1000;
+	int q = 1000;
+	unsigned char *pb_p = (unsigned char *)&pc;
+	unsigned char *pb_i = (unsigned char *)&q;
+	int i=0;
+	for(;i<sizeof(char*);i++)
+		printf("[%X]",pb_p[i]);
+	printf("\n");
+	Value *v = malloc(sizeof(Value));
+	//v->sval=(char*)1000;
+	v->ival=1000;
+	unsigned char *pb_v = (unsigned char *)v;
+	for(i=0;i<sizeof(Value);i++)
+		printf("[%X]",pb_v[i]);
+	printf("\n");*/
 	load_acode();
-	pc = ap = op = ip = 0;
+	pc = 0; ap = 0; op = 0; ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
 	ostack = (Orecord**) newmem(sizeof(Orecord*) * OSEGMENT);
@@ -321,6 +342,26 @@ void push_int(int i){
 	}
 }
 
+void push_string(char* s){
+	execute_adef(PTRSIZE);
+	top_ostack()->instance.sval=&(istack[ip]);
+	unsigned char *s_bytes=(unsigned char*)&s;
+	int p;
+	if(ENDIANESS){
+		p=0;
+		for(;p<PTRSIZE;p++){
+			push_istack();
+			*top_istack()=s_bytes[p];
+		}
+	}else{
+		p=PTRSIZE-1;
+		for(;p>=0;p--){
+			push_istack();
+			*top_istack()=s_bytes[p];
+		}
+	}
+}
+
 /**
  * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
  * @paramm i il valore da assegnare (0:falso, 1:true)
@@ -356,10 +397,18 @@ void pop_istack()
 unsigned char *pop_n_istack(int n){
 	unsigned char *i_bytes = malloc(n*sizeof(char));
 	int p = 0;
-	char *q = top_istack()+1-INTSIZE;
-	for(;p<INTSIZE;p++){
+	char *q = top_istack()+1-n;
+	for(;p<n;p++){
 		i_bytes[p]=*(q++);
 		pop_istack();
+	}
+	if(!ENDIANESS){
+		int i=-1;
+		while((++i)<(--p)){
+			unsigned char temp = i_bytes[i];
+			i_bytes[i]=i_bytes[p];
+			i_bytes[p]=temp;
+		}
 	}
 	return i_bytes;
 }
@@ -367,12 +416,19 @@ unsigned char *pop_n_istack(int n){
 int pop_int(){
 	unsigned char *i_bytes = pop_n_istack(INTSIZE);
 	pop_ostack();
-	int i=0,q=INTSIZE-1,res=0;
+	int i=0,res=0;
 	for(;i<INTSIZE;i++){
-		res = res|(i_bytes[i])<<(q-i);
+		res = res|(i_bytes[i])<<(ENDIANESS?(24-8*i):(8*i));
 	}
 	freemem((char *)i_bytes, INTSIZE);
+	printf("INTEGER: %d\n", res);
 	return res;
+}
+
+char* pop_string(){
+	unsigned char *i_bytes = pop_n_istack(PTRSIZE);
+	pop_ostack();
+	return (char*) i_bytes;
 }
 
 void execute(Acode *instruction)
@@ -431,7 +487,11 @@ void execute_store(int chain, int oid) {
 		target_ar = target_ar->al;
 	}
 	Orecord* p_obj = *(target_ar->head + oid);
-	p_obj->instance.ival=pop_int();
+	int size = top_ostack()->size;
+	unsigned char *bytes = pop_n_istack(size);
+	pop_ostack();
+	memcpy(&(p_obj->instance),bytes, size);
+
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
@@ -452,7 +512,7 @@ void execute_loci(int const_val){
 }
 
 void execute_locs(char* const_val){
-
+	push_string(const_val);
 }
 
 void execute_umin(){
@@ -666,6 +726,7 @@ void print_ostack(){
 	printf("# objects on ostack: %d\n", op);
 	for(i=0; i<op; i++){
 		printf("size of object: %d\n", ostack[i]->size);
+		printf("value of object: %s\n", ostack[i]->instance.sval);
 	}
 }
 
