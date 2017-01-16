@@ -345,6 +345,7 @@ void push_int(int i){
 }
 
 void push_string(char* s){
+	printf("PUSHED Pointer: %p\n", s);
 	execute_adef(PTRSIZE);
 	top_ostack()->instance.sval=&(istack[ip]);
 	unsigned char *s_bytes=(unsigned char*)&s;
@@ -430,7 +431,10 @@ int pop_int(){
 char* pop_string(){
 	unsigned char *i_bytes = pop_n_istack(PTRSIZE);
 	pop_ostack();
-	return (char*) i_bytes;
+	char* s = malloc(PTRSIZE);
+	memcpy(&s,i_bytes,PTRSIZE);
+	freemem((char *)i_bytes, PTRSIZE);
+	return s;
 }
 
 void execute(Acode *instruction)
@@ -493,7 +497,6 @@ void execute_store(int chain, int oid) {
 	unsigned char *bytes = pop_n_istack(size);
 	pop_ostack();
 	memcpy(&(p_obj->instance),bytes, size);
-
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
@@ -663,7 +666,7 @@ void execute_sgeq() {
 	else { // s1 >= s2
 		push_bool(1);
 	}
-	printf("SGEQ");
+	printf("SGEQ:\n");
 	print_istack();
 }
 
