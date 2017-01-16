@@ -51,6 +51,7 @@ char *top_istack();
 void print_ostack();
 void print_astack();
 void print_istack();
+int endian();
 void abstract_machine_Error(char *);
 
 #define ENDIANESS endian()
@@ -189,8 +190,25 @@ void load_acode(){
 
 void start_abstract_machine()
 {
+	/*printf("ENDIANESS: %d\n",ENDIANESS);
+	//char c[] = "abc";
+	char *pc = (char*)1000;
+	int q = 1000;
+	unsigned char *pb_p = (unsigned char *)&pc;
+	unsigned char *pb_i = (unsigned char *)&q;
+	int i=0;
+	for(;i<sizeof(char*);i++)
+		printf("[%X]",pb_p[i]);
+	printf("\n");
+	Value *v = malloc(sizeof(Value));
+	//v->sval=(char*)1000;
+	v->ival=1000;
+	unsigned char *pb_v = (unsigned char *)v;
+	for(i=0;i<sizeof(Value);i++)
+		printf("[%X]",pb_v[i]);
+	printf("\n");*/
 	load_acode();
-	pc = ap = op = ip = 0;
+	pc = 0; ap = 0; op = 0; ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
 	ostack = (Orecord**) newmem(sizeof(Orecord*) * OSEGMENT);
@@ -475,6 +493,7 @@ void execute_store(int chain, int oid) {
 	unsigned char *bytes = pop_n_istack(size);
 	pop_ostack();
 	memcpy(&(p_obj->instance),bytes, size);
+
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
