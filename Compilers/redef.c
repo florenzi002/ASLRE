@@ -43,6 +43,7 @@ void execute_equa();
 unsigned char *pop_n_istack(int);
 void pop_ostack();
 int pop_int();
+int endian();
 void push_int(int);
 Arecord *top_astack();
 Orecord *top_ostack();
@@ -51,6 +52,8 @@ void print_ostack();
 void print_astack();
 void print_istack();
 void abstract_machine_Error(char *);
+
+#define ENDIANESS endian()
 
 char* s_op_code[] = {
 		"ACODE",
@@ -155,17 +158,19 @@ void load_acode(){
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
 						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
-							char* string = (char*)malloc(sizeof(char)*(strlen(line)-1));
-							int counter = 0;
+							char *string = (char*)malloc(sizeof(char)*(strlen(line)-1));
+							int counter, pos;
+							counter = pos = 0;
 							char c = *line;
 							while(c!='\0'){
 								if(c!='"'){
-									*(string+counter)=c;
-									c=*(line+(++counter));
+									string[pos++]=c;
 								}
+								c=*(line+(++counter));
 							}
-							*(string+(++counter))='\0';
+							string[++counter]='\0';
 							instruction -> operands[j].sval = string;
+				
 						}
 						else {
 							instruction -> operands[j].ival = atoi(line);
@@ -321,6 +326,26 @@ void push_int(int i){
 	}
 }
 
+void push_string(char* s){
+	execute_adef(PTRSIZE);
+	top_ostack()->instance.sval=&(istack[ip]);
+	unsigned char *s_bytes=(unsigned char*)&s;
+	int p;
+	if(ENDIANESS){
+		p=0;
+		for(;p<PTRSIZE;p++){
+			push_istack();
+			*top_istack()=s_bytes[p];
+		}
+	}else{
+		p=PTRSIZE-1;
+		for(;p>=0;p--){
+			push_istack();
+			*top_istack()=s_bytes[p];
+		}
+	}
+}
+
 /**
  * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
  * @paramm i il valore da assegnare (0:falso, 1:true)
@@ -356,10 +381,18 @@ void pop_istack()
 unsigned char *pop_n_istack(int n){
 	unsigned char *i_bytes = malloc(n*sizeof(char));
 	int p = 0;
-	char *q = top_istack()+1-INTSIZE;
-	for(;p<INTSIZE;p++){
+	char *q = top_istack()+1-n;
+	for(;p<n;p++){
 		i_bytes[p]=*(q++);
 		pop_istack();
+	}
+	if(!ENDIANESS){
+		int i=-1;
+		while((++i)<(--p)){
+			unsigned char temp = i_bytes[i];
+			i_bytes[i]=i_bytes[p];
+			i_bytes[p]=temp;
+		}
 	}
 	return i_bytes;
 }
@@ -367,12 +400,19 @@ unsigned char *pop_n_istack(int n){
 int pop_int(){
 	unsigned char *i_bytes = pop_n_istack(INTSIZE);
 	pop_ostack();
-	int i=0,q=INTSIZE-1,res=0;
+	int i=0,res=0;
 	for(;i<INTSIZE;i++){
-		res = res|(i_bytes[i])<<(q-i);
+		res = res|(i_bytes[i])<<(ENDIANESS?(24-8*i):(8*i));
 	}
 	freemem((char *)i_bytes, INTSIZE);
+	printf("INTEGER: %d\n", res);
 	return res;
+}
+
+char* pop_string(){
+	unsigned char *i_bytes = pop_n_istack(PTRSIZE);
+	pop_ostack();
+	return (char*) i_bytes;
 }
 
 void execute(Acode *instruction)
@@ -431,7 +471,10 @@ void execute_store(int chain, int oid) {
 		target_ar = target_ar->al;
 	}
 	Orecord* p_obj = *(target_ar->head + oid);
-	p_obj->instance.ival=pop_int();
+	int size = top_ostack()->size;
+	unsigned char *bytes = pop_n_istack(size);
+	pop_ostack();
+	memcpy(&(p_obj->instance),bytes, size);
 }
 
 void execute_push(int num_formals_aux, int num_loc, int chain){
@@ -452,7 +495,7 @@ void execute_loci(int const_val){
 }
 
 void execute_locs(char* const_val){
-
+	push_string(const_val);
 }
 
 void execute_umin(){
@@ -532,12 +575,10 @@ void execute_divi()
  */
 void execute_igrt()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
-	print_istack();
 }
 
 /**
@@ -546,12 +587,10 @@ void execute_igrt()
  */
 void execute_igeq()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>=n);
-	print_istack();
 }
 
 /**
@@ -560,12 +599,10 @@ void execute_igeq()
  */
 void execute_ilet()
 {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m<n);
-	print_istack();
 }
 
 /**
@@ -573,48 +610,72 @@ void execute_ilet()
  * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
  */
 void execute_ileq() {
-	print_istack();
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m<=n);
-	print_istack();
 }
 
+/**
+ * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è maggiore della
+ * seconda. In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0.
+ */
 void execute_sgrt() {
-	print_istack();
-	int n, m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m<=n);
-	print_istack();
+	const char* s2 = pop_string();
+	const char* s1 = pop_string();
+	if(strcmp(s1,s2) == 1) { // s1 > s2
+		push_bool(1);
+	}
+	else { // s1 <= s2
+		push_bool(0);
+	}
 }
 
+/**
+ * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è maggiore o
+ * uguale alla seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ */
 void execute_sgeq() {
-	print_istack();
-	int n, m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m<=n);
+	const char* s2 = pop_string();
+	const char* s1 = pop_string();
+	if(strcmp(s1,s2) == -1) { // s1 < s2
+		push_bool(0);
+	}
+	else { // s1 >= s2
+		push_bool(1);
+	}
+	printf("SGEQ");
 	print_istack();
 }
 
+/**
+ * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è minore della
+ * seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ */
 void execute_slet() {
-	print_istack();
-	int n, m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m<=n);
-	print_istack();
+	const char* s2 = pop_string();
+	const char* s1 = pop_string();
+	if(strcmp(s1,s2) == -1) { // s1 < s2
+		push_bool(1);
+	}
+	else { // s1 >= s2
+		push_bool(0);
+	}
 }
 
+/**
+ * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è minore della
+ * seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ */
 void execute_sleq() {
-	print_istack();
-	int n, m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m<=n);
-	print_istack();
+	const char* s2 = pop_string();
+	const char* s1 = pop_string();
+	if(strcmp(s1,s2) == 1) { // s1 > s2
+		push_bool(0);
+	}
+	else { // s1 <= s2
+		push_bool(1);
+	}
 }
 
 void execute_adef(int size)
@@ -639,12 +700,10 @@ void execute_sdef(int size)
  */
 void execute_equa()
 {
-	print_istack();
 	int n,m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m==n);
-	print_istack();
 }
 
 /**
@@ -653,12 +712,10 @@ void execute_equa()
  */
 void execute_nequ()
 {
-	print_istack();
 	int n,m;
 	n = pop_int();
 	m = pop_int();
 	push_bool(m!=n);
-	print_istack();
 }
 
 void print_ostack(){
@@ -666,6 +723,7 @@ void print_ostack(){
 	printf("# objects on ostack: %d\n", op);
 	for(i=0; i<op; i++){
 		printf("size of object: %d\n", ostack[i]->size);
+		printf("value of object: %s\n", ostack[i]->instance.sval);
 	}
 }
 
