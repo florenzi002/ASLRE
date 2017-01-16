@@ -169,9 +169,9 @@ void load_acode(){
 								}
 								c=*(line+(++counter));
 							}
-							string[++counter]='\0';
+							string[pos]='\0';
 							instruction -> operands[j].sval = string;
-				
+
 						}
 						else {
 							instruction -> operands[j].ival = atoi(line);
@@ -345,7 +345,6 @@ void push_int(int i){
 }
 
 void push_string(char* s){
-	printf("PUSHED Pointer: %p\n", s);
 	execute_adef(PTRSIZE);
 	top_ostack()->instance.sval=&(istack[ip]);
 	unsigned char *s_bytes=(unsigned char*)&s;
@@ -467,9 +466,9 @@ void execute(Acode *instruction)
 	/*case ISTO: execute_isto(); break;
 	case SKIP: execute_skip(); break;
 	case SKPF: execute_skpf(); break;
+	 */
 	case EQUA: execute_equa(); break;
 	case NEQU: execute_nequ(); break;
-	 */
 	case ADDI: execute_addi(); break;
 	case SUBI: execute_subi(); break;
 	case MULI: execute_muli(); break;
@@ -722,10 +721,28 @@ void execute_sdef(int size)
  */
 void execute_equa()
 {
-	int n,m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m==n);
+	unsigned char *n, *m;
+	int s1 = top_ostack()->size;
+	memcpy(&n, pop_n_istack(s1), s1);
+	pop_ostack();
+	int s2 = top_ostack()->size;
+	memcpy(&m, pop_n_istack(s2), s2);
+	pop_ostack();
+	if(s1==s2) {
+		int i=0;
+		for(;i<s1;i++) {
+			if(n[i]!=m[i]) {
+				push_bool(0);
+				return;
+			}
+		}
+		push_bool(1);
+	}
+	else {
+		push_bool(0);
+	}
+	printf("EQUA\n");
+	print_istack();
 }
 
 /**
@@ -734,10 +751,26 @@ void execute_equa()
  */
 void execute_nequ()
 {
-	int n,m;
-	n = pop_int();
-	m = pop_int();
-	push_bool(m!=n);
+	unsigned char *n, *m;
+	int s1 = top_ostack()->size;
+	memcpy(&n, pop_n_istack(s1), s1);
+	pop_ostack();
+	int s2 = top_ostack()->size;
+	memcpy(&m, pop_n_istack(s2), s2);
+	pop_ostack();
+	if(s1!=s2) {
+		push_bool(1);
+	}
+	else {
+		int i=0;
+		for(;i<s1;i++) {
+			if(n[i] != m[i]) {
+				push_bool(1);
+				return;
+			}
+		}
+		push_bool(0);
+	}
 }
 
 void print_ostack(){

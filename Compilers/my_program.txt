@@ -5,9 +5,9 @@ APOP
 ADEF 8
 LOCS "Ciao"
 STOR 0 0
-LOCS "ABCDEF"
 LOCS "abcdef"
-SGEQ
+LOCS "abcdef"
+EQUA
 LOCI 7
 LOCI 6
 ADDI
