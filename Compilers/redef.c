@@ -207,6 +207,15 @@ void start_abstract_machine()
 	for(i=0;i<sizeof(Value);i++)
 		printf("[%X]",pb_v[i]);
 	printf("\n");*/
+	/*
+	int q = 5;
+	unsigned char *q_bytes=(unsigned char*)&q;
+	int s = 1;
+	unsigned char *s_bytes=(unsigned char*)&s;
+
+	printf("STRCMP: %d\n", strcmp(s_bytes,q_bytes));*/
+
+
 	load_acode();
 	pc = 0; ap = 0; op = 0; ip = 0;
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
@@ -728,21 +737,8 @@ void execute_equa()
 	int s2 = top_ostack()->size;
 	memcpy(&m, pop_n_istack(s2), s2);
 	pop_ostack();
-	if(s1==s2) {
-		int i=0;
-		for(;i<s1;i++) {
-			if(n[i]!=m[i]) {
-				push_bool(0);
-				return;
-			}
-		}
-		push_bool(1);
-	}
-	else {
-		push_bool(0);
-	}
-	printf("EQUA\n");
-	print_istack();
+	printf("EQ?: %d\n", strcmp(n,m));
+	push_bool(0);
 }
 
 /**
