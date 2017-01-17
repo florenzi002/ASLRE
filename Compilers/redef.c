@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "redef.h"
+#include "functionHash.h"
 
 void *newmem(int);
 void freemem(char *, int);
@@ -170,8 +171,7 @@ void load_acode(){
 								c=*(line+(++counter));
 							}
 							string[pos]='\0';
-							instruction -> operands[j].sval = string;
-
+							instruction -> operands[j].sval = insertFind(hash(string), string);
 						}
 						else {
 							instruction -> operands[j].ival = atoi(line);
@@ -215,6 +215,14 @@ void start_abstract_machine()
 
 	printf("STRCMP: %d\n", strcmp(s_bytes,q_bytes));*/
 
+	/*printf("START>\n");
+	for(int i=0; i< 100; i++){
+		int q = rand()%5;
+		char* arr[] = {"Ciao", "Tanto", "Culo", "Tette", "Miao"};
+		char* str = arr[q];
+		insertFind(hash(str), str);
+	}
+	print();*/
 
 	load_acode();
 	pc = 0; ap = 0; op = 0; ip = 0;
@@ -737,8 +745,7 @@ void execute_equa()
 	int s2 = top_ostack()->size;
 	memcpy(&m, pop_n_istack(s2), s2);
 	pop_ostack();
-	printf("EQ?: %d\n", strcmp(n,m));
-	push_bool(0);
+	push_bool(n==m);
 }
 
 /**
@@ -754,19 +761,7 @@ void execute_nequ()
 	int s2 = top_ostack()->size;
 	memcpy(&m, pop_n_istack(s2), s2);
 	pop_ostack();
-	if(s1!=s2) {
-		push_bool(1);
-	}
-	else {
-		int i=0;
-		for(;i<s1;i++) {
-			if(n[i] != m[i]) {
-				push_bool(1);
-				return;
-			}
-		}
-		push_bool(0);
-	}
+	push_bool(n!=m);
 }
 
 void print_ostack(){

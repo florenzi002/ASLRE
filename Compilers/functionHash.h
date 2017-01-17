@@ -14,7 +14,7 @@
 #ifndef FUNCTIONSHASH_H
 #define FUNCTIONSHASH_H
 
-#define TOT 50
+#define TOT 20
 #define SHIFT 4
 
 
@@ -29,7 +29,7 @@ Nodo* creaNodo(char *id);
 
 char* insertFind(int h, char *id);
 
-void stampa();
+void print();
 
 
 #endif /* FUNCTIONSHASH_H */

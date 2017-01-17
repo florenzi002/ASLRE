@@ -8,73 +8,53 @@
 #include "functionHash.h"
 
 
-Nodo *tabella[TOT - 1];
+Nodo *ht[TOT];
 
 int hash(char *id){
     int h = 0;
     int i= 0;
-
     for(i = 0; id[i] != '\0'; i++){
-
         h = ((h << SHIFT)+id[i])%TOT;
-
     }
     return h;
-
 }
 
 Nodo *creaNodo(char *id){
-    Nodo *nuovoNodo;
-    nuovoNodo = malloc(sizeof(Nodo));
-    char *p = malloc(strlen(id)+1);
-    strcpy(p,id);
-    nuovoNodo->stringa = p;
+    Nodo *nuovoNodo = malloc(sizeof(Nodo));
+    nuovoNodo->stringa = malloc(strlen(id)+1);
+    strcpy(nuovoNodo->stringa, id);
     return nuovoNodo;
 }
 
 
 char* insertFind(int h, char *id){
-    char *p;
-    Nodo *nuovoNodo, *parente;
-    if(!tabella[h]){ // se non c'è già un nodo con quell'hash
-
-        nuovoNodo = creaNodo(id);
-        tabella[h] = nuovoNodo;
-
-
-    }else{ // se c'è già un nodo con quell'hash
-
-        int trovato = 0;
-        int nullo = 0;
-        parente = tabella[h];
-        while(!nullo && !trovato){
-
-            if((strcmp(parente->stringa,id)) == 0){ // controllo il valore della stringa del nodo
-                //se trovo un nodo già presente con l stessa stringa
-
-                p = parente->stringa;
-                return p;
-
-            }else{ //se il nodo ha stringa diversa passo oltre
-
-                    if(parente->fratello != 0){ // se il puntatore è assegnato passo al nodo successivo
-
-                        parente = parente->fratello;
-
-                    }else{//altrimenti sono arrivato in fondo senza trovare un nodo con la stringa uguale  e devo uscire dal while e crearne uno nuovo nodo
-
-                        nullo = 1;
-                    }
-
-            }
-
-        }
-
-        nuovoNodo = creaNodo(id);
-        parente->fratello = nuovoNodo;
-
+	Nodo* node;
+    if((node=ht[h])==NULL){
+    	ht[h] = node = creaNodo(id);
+    	return node->stringa;
     }
-    p = nuovoNodo->stringa;
-    return p;
+    while(strcmp(node->stringa, id)!=0){
+    	Nodo* next = node->fratello;
+    	if(next==NULL){
+    		node->fratello = creaNodo(id);
+    		return node->fratello->stringa;
+    	}
+    	node=next;
+    }
+    return node->stringa;
+}
+
+void print(){
+	int i=0;
+	for(;i<TOT;i++){
+		Nodo* node;
+		if((node=ht[i])!=NULL){
+			printf("%d\n\t%s ", i, node->stringa);
+			while((node=node->fratello)!=NULL){
+				printf("%s ", node->stringa);
+			}
+			printf("\n");
+		}
+	}
 }
 
