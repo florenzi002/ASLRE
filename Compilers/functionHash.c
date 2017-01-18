@@ -1,5 +1,5 @@
 /*
- * Author: andrea
+ * Authors: Fabio Lorenzi & Cristian Sampietri
  */
 
 #include <stdio.h>
@@ -57,4 +57,3 @@ void print(){
 		}
 	}
 }
-

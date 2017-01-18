@@ -2,7 +2,7 @@
  * redef.c
  *
  *  Created on: 09/dic/2016
- *      Author: fabio & cristian
+ *      Author: Fabio Lorenzi & Cristian Sampietri
  */
 
 #include <stdlib.h>
@@ -11,6 +11,7 @@
 #include "redef.h"
 #include "functionHash.h"
 
+// Prototipi delle funzioni
 void *newmem(int);
 void freemem(char *, int);
 Arecord *push_activation_record();
@@ -44,6 +45,7 @@ void execute_equa();
 unsigned char *pop_n_istack(int);
 void pop_ostack();
 int pop_int();
+int pop_bool();
 int endian();
 void push_int(int);
 Arecord *top_astack();
@@ -55,8 +57,9 @@ void print_istack();
 int endian();
 void abstract_machine_Error(char *);
 
-#define ENDIANESS endian()
+#define ENDIANESS endian()  // Costante per tenere traccia dell'Endianess della macchina
 
+// Array di stringhe contenente tutti i codici corrispondenti ai vari operatori
 char* s_op_code[] = {
 		"ACODE",
 		"PUSH",
@@ -100,7 +103,7 @@ char* s_op_code[] = {
 		"NOOP"
 };
 
-
+// Costanti che indicano per quanti elementi bisogna allocare memoria, rispettivamente, per Astack, Ostack e Istack
 const int ASEGMENT = 10;
 const int OSEGMENT = 10;
 const int ISEGMENT = 10;
@@ -108,15 +111,16 @@ const int ISEGMENT = 10;
 const int LINEDIM = 128;
 
 Acode *program;
-int pc, code_size;
-Arecord **astack;
-Orecord **ostack;
-char *istack;
-int asize, osize, isize, code_size;
+int pc;
+Arecord **astack;        // Activation Record
+Orecord **ostack;        // Object Record
+char *istack;            // Singola cella dell'Instance Stack (cioè una singola cella di memoria
+int asize, osize, isize; // Dimensioni (numero di elementi) dei vari stack
+int code_size;           // Numero di righe che costituiscono il file con l'Acode
 
-int ap, op, ip;
+int ap, op, ip;          // Variabili che tengono traccia della posizione nei vari stack (prima cella libera)
 
-long allocated = 0, deallocated = 0;
+long allocated = 0, deallocated = 0; // Variabili che tengono traccia della memoria allocata e di quella deallocata
 
 /**
  * Funzione che apre il file contenente l'A-Code e lo legge riga per riga, mettendo ciascuna di queste in
@@ -128,12 +132,14 @@ void load_acode(){
 	char str[LINEDIM];
 	// Controllo se il puntatore a file e' nullo
 	if(file != NULL){
-		// Recupero la prima riga del file, che serve a sapere il numero di linee del file con l'Acode
+		// Recupero la prima riga del file (ACODE size), che serve per sapere il numero di linee del file con l'Acode
 		if(fgets(str, sizeof(str), file)==NULL)
 			abstract_machine_Error("Error loading code");
-		char *last = strrchr(str, ' ');
+		// Cerco la prima occorrenza dello spazio nella riga
+		char *last = strrchr(str, ' '); // Last punta alla prima occorrenza di ' ' (se lo trova)
 		if(last==NULL)
 			abstract_machine_Error("Error loading code");
+		// Recupero size dalla prima riga
 		code_size = atoi(last+1);
 		// Alloco la memoria necessaria a 'program', che e' un array di Acode, dove l'Acode e' la singola riga del file
 		program = malloc(code_size*sizeof(Acode));
@@ -147,19 +153,23 @@ void load_acode(){
 			int str_len = strlen(str);
 			// Sostituisco l'eventuale newline con il carattere di terminazione della stringa
 			str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
-			// Tokenizzo la stringa usando come separatore lo spazio
-			line = strtok(str, " ");
+			// Tokenizzo la stringa usando come separatore lo spazio. In questo modo posso recuperare l'operatore e gli operandi
+			line = strtok(str, " "); // line contiene ora il codice dell'operatore
 			if(line == NULL)
 				abstract_machine_Error("Error loading code");
 			int i;
+			//
 			for(i=0; i<(sizeof(s_op_code)/sizeof(char*)); i++){
-				if(strcmp(line,s_op_code[i])==0){
-					Acode *instruction = malloc(sizeof(Acode));
-					instruction->operator = i;
+				if(strcmp(line,s_op_code[i])==0) { // line coincide con uno dei codici
+					Acode *instruction = malloc(sizeof(Acode)); // Alloco memoria per una nuova struct Acode
+					instruction->operator = i;  // Assegno il campo operatore della struct con la stringa corrispondente (p.e. LOCI, LOCS, ecc.)
+
+					// Procedo a recuperare gli eventuali operatori associati all'Acode
 					int j = 0;
 					line = strtok(NULL, " ");
 					while (line!=NULL) {
-						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {
+						// Verifico se devo recuperare una stringa (primo operando di LOCS o WRITE, oppure secondo operando della READ
+						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {      // L'operando è una stringa
 							char *string = (char*)malloc(sizeof(char)*(strlen(line)-1));
 							int counter, pos;
 							counter = pos = 0;
@@ -171,61 +181,33 @@ void load_acode(){
 								c=*(line+(++counter));
 							}
 							string[pos]='\0';
+							// Assegno il sval del j-esimo operando della riga di Acode.
 							instruction -> operands[j].sval = insertFind(hash(string), string);
 						}
-						else {
-							instruction -> operands[j].ival = atoi(line);
+						else {  // L'operando è un intero
+							instruction -> operands[j].ival = atoi(line); // Assegno l'ival del j-esimo operando della riga di Acode
 						}
 						line = strtok(NULL, " ");
 						j++;
 					}
-					program[p++] = *instruction;
+					program[p++] = *instruction; // Aggiungo l'istruzione (una struct Acode) al programma (array di Acode)
 					break;
 				}
 			}
 		}
 	}
-	fclose(file);
+	fclose(file);  // Chiusura del file
 }
 
+/**
+ * Funzione che avvia la macchina virtuale effettuando le necessarie inizializzazioni e allocazioni di memoria
+ */
 void start_abstract_machine()
 {
-	/*printf("ENDIANESS: %d\n",ENDIANESS);
-	//char c[] = "abc";
-	char *pc = (char*)1000;
-	int q = 1000;
-	unsigned char *pb_p = (unsigned char *)&pc;
-	unsigned char *pb_i = (unsigned char *)&q;
-	int i=0;
-	for(;i<sizeof(char*);i++)
-		printf("[%X]",pb_p[i]);
-	printf("\n");
-	Value *v = malloc(sizeof(Value));
-	//v->sval=(char*)1000;
-	v->ival=1000;
-	unsigned char *pb_v = (unsigned char *)v;
-	for(i=0;i<sizeof(Value);i++)
-		printf("[%X]",pb_v[i]);
-	printf("\n");*/
-	/*
-	int q = 5;
-	unsigned char *q_bytes=(unsigned char*)&q;
-	int s = 1;
-	unsigned char *s_bytes=(unsigned char*)&s;
+	load_acode(); // Funzione per la lettura del file con l'Acode
+	pc = 0; ap = 0; op = 0; ip = 0; // Inizializzazione dei contatori
 
-	printf("STRCMP: %d\n", strcmp(s_bytes,q_bytes));*/
-
-	/*printf("START>\n");
-	for(int i=0; i< 100; i++){
-		int q = rand()%5;
-		char* arr[] = {"Ciao", "Tanto", "Culo", "Tette", "Miao"};
-		char* str = arr[q];
-		insertFind(hash(str), str);
-	}
-	print();*/
-
-	load_acode();
-	pc = 0; ap = 0; op = 0; ip = 0;
+	// Allocazione della memoria per i vari stack
 	astack = (Arecord**) newmem(sizeof(Arecord*) * ASEGMENT);
 	asize = ASEGMENT;
 	ostack = (Orecord**) newmem(sizeof(Orecord*) * OSEGMENT);
@@ -234,82 +216,138 @@ void start_abstract_machine()
 	isize = ISEGMENT;
 }
 
+/**
+ * Funzione che arresta la macchina virtuale, liberando la memoria allocata per gli stack e per l'array di Acode.
+ * Vengono inoltre stampate informazioni sulla memoria allocata, deallocata e residua
+ */
 void stop_abstract_machine()
 {
+	// Viene liberata la memoria allocata
 	freemem((char*) program, sizeof(Acode) * code_size);
 	freemem((char*) astack, sizeof(Arecord*) * asize);
 	freemem((char*) ostack, sizeof(Orecord*) * osize);
 	freemem(istack, isize);
+
+	// Stampa a video delle informazioni sull'esecuzione del programma
 	printf("Program executed without Errors\n");
 	printf("Allocation: %ld bytes\n", allocated);
 	printf("Deallocation: %ld bytes\n", deallocated);
 	printf("Residue: %ld bytes\n", allocated - deallocated);
 }
 
+/**
+ * Funzione che effettua l'allocazione della memoria chiamando la funzione malloc
+ *
+ * @param size --> la quantita' di memoria da allocare
+ *
+ * @return p --> Puntatore alla memoria allocata
+ */
 void *newmem(int size)
 {
 	void *p;
 	if((p = malloc(size)) == NULL)
 		abstract_machine_Error("Failure in memory allocation");
-	allocated += size;
+	allocated += size; // Viene aggiornata la variabile che tiene traccia della memoria allocata
 	return p;
 }
 
+/**
+ * Funzione che effettua la deallocazione della memoria chiamando la funzione free
+ *
+ * @param *p --> Puntatore alla memoria da deallocare
+ * @param size --> Quantita' di memoria da deallocare
+ */
 void freemem(char *p, int size)
 {
 	free(p);
-	deallocated += size;
+	deallocated += size;  // Aggiorno la variabile che tiene traccia della memoria deallocata
 }
 
+/**
+ * Funzione che esegue il push di un Activation Record, aggiungendolo all'astack
+ *
+ * @return l'Activation Record creato
+ */
 Arecord *push_activation_record()
 {
 	Arecord **full_astack;
 	int i;
-	if(ap == asize)
+	if(ap == asize) // Verifico se l'astack e' pieno
 	{
+		// Devo allocare nuovamente la memoria, quindi copio l'astack nella variabile temporanea
 		full_astack = astack;
+		// Alloco nuova memoria per l'astack
 		astack = (Arecord**) newmem(sizeof(Arecord*) * (asize + ASEGMENT));
 		for(i = 0; i < asize; i++)
 			astack[i] = full_astack[i];
+		// Libero la memoria allocata per la variabile di supporto
 		freemem((char*) full_astack, sizeof(Arecord*) * asize);
+		// Aggiorno la dimensione (numero di Arecord) dell'Activation Stack
 		asize += ASEGMENT;
 	}
+	// Restituisco l'Activation Record creato
 	return (astack[ap++] = (Arecord*) newmem(sizeof(Arecord)));
 }
 
+/**
+ * Funzione che recupera l'Activation Record in cima allo stack (cioe' quello presente nella posizione appena sopra a quella
+ * puntata da ap, che indica la prima posizione libera)
+ *
+ * @return l'Activation Record in cima all'Activation Stack
+ */
 Arecord *top_astack(){
-	if (ap==0) {
+	if (ap==0) { // Errore: Astack vuoto
 		abstract_machine_Error("Failure accessing top of Activation Stack");
 	}
 	return astack[ap-1];
 }
 
+/**
+ * Funzione che esegue il push di un Object Record, aggiungendolo all'Obect Stack
+ *
+ * @return l'Object Record appena creato
+ */
 Orecord *push_ostack(){
 	Orecord **full_ostack;
 	int i;
-	if(op == osize)
+	if(op == osize) // Verifico se l'Obect Stack e' pieno
 	{
+		// Devo allocare nuovamente la memoria, quindi copio l'astack nella variabile temporanea
 		full_ostack = ostack;
+		// Alloco nuova memoria per l'ostack
 		ostack = (Orecord**) newmem(sizeof(Orecord*) * (osize + OSEGMENT));
 		for(i = 0; i < osize; i++)
 			ostack[i] = full_ostack[i];
+		// Libero la memoria allocata per la variabile di supporto
 		freemem((char*) full_ostack, sizeof(Orecord*) * osize);
 		osize += OSEGMENT;
 	}
+	// Restituisco l'Object Record creato
 	return (ostack[op++] = (Orecord*) newmem(sizeof(Orecord)));
 }
 
+/**
+ * Funzione che recupera l'Object Record in cima allo stack (cioe' quello presente nella posizione appena sopra a quella
+ * puntata da op, che indica la prima posizione libera)
+ *
+ * @return l'Object Record in cima all'Activation Stack
+ */
 Orecord *top_ostack(){
-	if (op==0) {
+	if (op==0) { // Errore: Object Stack vuoto
 		abstract_machine_Error("Failure accessing top of Activation Stack");
 	}
 	return ostack[op-1];
 }
 
+/**
+ * Funzione che alloca un nuovo elemento all'Instance Stack,
+ *
+ * @return l'indirizzo della nuova cella creata nell'istack
+ */
 char *push_istack(){
 	char *full_istack;
 	int i;
-	if(ip == isize)
+	if(ip == isize) // Verifico se l'Instance Stack e' pieno
 	{
 		full_istack = istack;
 		istack = (char*) newmem(sizeof(char*) * (isize + ISEGMENT));
@@ -322,37 +360,50 @@ char *push_istack(){
 	return &(istack[ip++]);
 }
 
+/**
+ * Funzione che recupera la cella dell'Instance Stack che si trova in cima allo stack (cioe' quella presente nella
+ * posizione appena sopra a quella puntata da ip, che indica la prima posizione libera)
+ *
+ * @return l'Object Record in cima all'Activation Stack
+ */
 char *top_istack(){
-	if (ip==0) {
+	if (ip==0) { // Errore: Instance Stack vuoto
 		abstract_machine_Error("Failure accessing top of Instance Stack");
 	}
 	return &(istack[ip-1]);
 }
 
+/**
+ * Funzione che verifica l'Endianess della macchina
+ */
 int endian(){
 	int i=1;
 	char *p = (char *)&i;
 	if(p[0]==1)
-		return 0;
-	return 1;
+		return 0;  // Little Endian
+	return 1;      // Big Endian
 }
 
 /**
- * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
- * @param i il valore da assegnare
+ * Alloca memoria per un nuovo intero nell'istack e gli assegna un valore
+ * @param i --> L'intero da mettere nell'Instance Stack
  */
 void push_int(int i){
+	// Chiamo ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione di un intero
 	execute_adef(INTSIZE);
 	top_ostack()->instance.sval=&(istack[ip]);
+	// Trasformo l'intero in sequenza di bytes
 	unsigned char *i_bytes=(unsigned char*)&i;
 	int p;
-	if(ENDIANESS){
+	// A seconda dell'Endianess cambia l'ordine con cui i vari byte che formano l'intero vengono memorizzati
+	if(ENDIANESS){ // Big Endian (la memorizzazione inizia dal byte piu' significativo)
 		p=0;
+		// Memorizzo byte per byte nell'istack
 		for(;p<INTSIZE;p++){
 			push_istack();
 			*top_istack()=i_bytes[p];
 		}
-	}else{
+	}else{ // Little Endian (la memorizzazione inizia dal byte meno significativo)
 		p=INTSIZE-1;
 		for(;p>=0;p--){
 			push_istack();
@@ -361,19 +412,29 @@ void push_int(int i){
 	}
 }
 
+/**
+ * Funzione che memorizza nell'Instance stack il puntatore alla stringa
+ *
+ * @param s --> Il puntatore alla stringa che deve essere messo nell'Istack
+ */
 void push_string(char* s){
+	// Chiamo l'ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione in bytes di un puntatore
 	execute_adef(PTRSIZE);
 	top_ostack()->instance.sval=&(istack[ip]);
+	// Converto in una sequenza di bytes
 	unsigned char *s_bytes=(unsigned char*)&s;
 	int p;
-	if(ENDIANESS){
+	// A seconda dell'Endianess cambia l'ordine con cui i vari byte che formano il puntatore vengono memorizzati
+	if(ENDIANESS){ // Big Endian (la memorizzazione inizia dal byte piu' significativo)
 		p=0;
+		// Memorizzo byte per byte nell'istack
 		for(;p<PTRSIZE;p++){
 			push_istack();
 			*top_istack()=s_bytes[p];
 		}
-	}else{
+	}else{ // Little Endian (la memorizzazione inizia dal byte meno significativo)
 		p=PTRSIZE-1;
+		// Memorizzo byte per byte nell'istack
 		for(;p>=0;p--){
 			push_istack();
 			*top_istack()=s_bytes[p];
@@ -382,47 +443,69 @@ void push_string(char* s){
 }
 
 /**
- * Alloca memoria per un nuovo elemento nell'istack e gli assegna un valore
- * @paramm i il valore da assegnare (0:falso, 1:true)
+ * Funzione che memorizza nell'Instance Stack uno zero o un uno
+ *
+ * @paramm i --> il valore da assegnare (0:falso, 1:true)
  */
 void push_bool(int i) {
-	push_istack();
-	istack[ip-1] = i;
+	push_int(i);
 }
 
+/**
+ * Funzione che rimuove un Activation Record dalla cima dell'Activation Stack
+ */
 void pop_activation_record()
 {
-	if(ap == 0)
+	if(ap == 0) // Errore: Activation Stack vuoto
 		abstract_machine_Error("Failure in popping activation record");
+	// Libera la memoria allocata per l'Activation Record che si trova in cima all'astack
 	freemem((char*) astack[--ap],
 			sizeof(Arecord));
 }
 
+/**
+ * Funzione che rimuove un Obect Record dalla cima dell'Object Stack
+ */
 void pop_ostack()
 {
-	if(op == 0)
+	if(op == 0) // Errore: Object Stack vuoto
 		abstract_machine_Error("Failure in popping object stack record");
+	// Libera la memoria allocata per l'Object Record che si trova in cima all'ostack
 	freemem((char*) ostack[--op],
 			sizeof(Orecord));
 }
 
+/**
+ * Funzione che decrementa l'Instance Pointer di una unita'
+ */
 void pop_istack()
 {
-	if(ip == 0)
+	if(ip == 0) // Errore: Instance Stack vuoto
 		abstract_machine_Error("Failure in popping instance stack record");
 	ip--;
 }
 
+/**
+ * Funzione che recupera n bytes a partire dalla cima dell'Instance Stack
+ *
+ * @param n --> Specifica il numero di bytes da recuperare
+ *
+ * @return --> Puntatore ai bytes presi dall'Instance Stack
+ */
 unsigned char *pop_n_istack(int n){
 	unsigned char *i_bytes = malloc(n*sizeof(char));
 	int p = 0;
+	// Risalgo nell'Instance Stack del numero di posizioni necessario per recuperare la prima
 	char *q = top_istack()+1-n;
 	for(;p<n;p++){
+		// A ciascun byte di i_bytes assegno il valore di ciò che punta q
 		i_bytes[p]=*(q++);
+		// Decremento l'Instance Pointer
 		pop_istack();
 	}
-	if(!ENDIANESS){
+	if(!ENDIANESS){ // Little Endian
 		int i=-1;
+		// Inverto il contenuto dell'array
 		while((++i)<(--p)){
 			unsigned char temp = i_bytes[i];
 			i_bytes[i]=i_bytes[p];
@@ -432,30 +515,57 @@ unsigned char *pop_n_istack(int n){
 	return i_bytes;
 }
 
+/**
+ * Funzione che recupera un intero a partire dalla cima dell'Instance Stack
+ *
+ * @return --> L'intero recuperato dall'Instance Stack
+ */
 int pop_int(){
+	// Chiamo la funzione per recuperare dalla cima dell'Instance Stack un numero di bytes pari a INTSIZE (che in genere e' 4)
 	unsigned char *i_bytes = pop_n_istack(INTSIZE);
+	// Rimuovo l'Object Record associato all'intero recuperato
 	pop_ostack();
 	int i=0,res=0;
 	for(;i<INTSIZE;i++){
 		res = res|(i_bytes[i])<<(ENDIANESS?(24-8*i):(8*i));
 	}
+	// TODO freemem o free?
 	freemem((char *)i_bytes, INTSIZE);
 	printf("INTEGER: %d\n", res);
 	return res;
 }
 
+/**
+ * Funzione che recupera una stringa dalla cima dell'Instance Stack
+ *
+ * @return --> Puntatore alla stringa recuperata
+ */
 char* pop_string(){
+	// Chiamo la funzione per recuperare dalla cima dell'Instance Stack un numero di bytes pari a PTRSIZE
 	unsigned char *i_bytes = pop_n_istack(PTRSIZE);
+	// Rimuovo l'Object Record associato al puntatore
 	pop_ostack();
+	// Alloco la memoria per il puntatore alla stringa da restituire
 	char* s = malloc(PTRSIZE);
+	// Copio PTRSIZE bytes da i_bytes all'indirizzo di s
 	memcpy(&s,i_bytes,PTRSIZE);
 	freemem((char *)i_bytes, PTRSIZE);
 	return s;
 }
 
+int pop_bool(){
+	return pop_int();
+}
+
+/**
+ * Funzione che esegue una singola istruzione (cioe' una singola riga del file con l'ACode
+ *
+ * @param instruction --> Puntatore alla struttura Acode contenente l'operatore e gli operandi dell'istruzione da eseguire
+ */
 void execute(Acode *instruction)
 {
-	printf("%d - %s\n", instruction->operator, s_op_code[instruction->operator]);
+	// printf("%d - %s\n", instruction->operator, s_op_code[instruction->operator]);
+	// A seconda dell'operatore, chiamo la funzione che esegue la corrispondente istruzione
 	switch(instruction->operator)
 	{
 	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival, instruction->operands[2].ival); break;
@@ -502,77 +612,115 @@ void execute(Acode *instruction)
 	}
 }
 
+/**
+ * Funzione che esegue l'istruzione STORE per l'assegnamento di un identificatore
+ *
+ * @param chain --> Distanza nell'ambiente (indica di quanti passi bisogna risalire nella catena statica)
+ * @param oid --> L'oid dell'oggetto assegnato
+ */
 void execute_store(int chain, int oid) {
 	Arecord* target_ar = top_astack();
 	int i;
+	// Tramite l'access link, risalgo di un numero di Activation Record pari a quello specificato nel parametro chain
 	for(i=0; i<chain; i++) {
 		target_ar = target_ar->al;
 	}
+	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 	int size = top_ostack()->size;
+	// Recupero dall'istack un numero di bytes specificato dal campo size dell'Orecord
 	unsigned char *bytes = pop_n_istack(size);
+	// Rimuovo l'Object Record dalla cima dell'Object Stack
 	pop_ostack();
 	memcpy(&(p_obj->instance),bytes, size);
 }
 
+/**
+ * Funzione che esegue l'istruzione PUSH per creare l'Activation Record all'atto della chiamata di funzione
+ *
+ * @param num_formals_aux --> Numero di parametri formali + ausiliari
+ * @param num_loc --> Numero di costanti locali
+ * @param chain --> Distanza tra l'ambiente del chiamante e l'ambiente in cui la funzione e' definita
+ */
 void execute_push(int num_formals_aux, int num_loc, int chain){
+	// Chiamo la funzione per allocare un nuovo Activation Record e aggiungerlo all'Activation Stack
 	Arecord *ar = push_activation_record();
+	//
 	ar->head = &ostack[op-num_formals_aux];
+	// Il numero di oggetti associati all'Activation Record e' dato dal numero dei locali + il numero dei parametri formali e ausiliari
 	ar->objects = num_loc+num_formals_aux;
+	// Il return address viene settato come program-counter+1
 	ar->retad = pc+1;
 	if(chain<=0)
 		ar->al=NULL;
 }
 
+/**
+ * Funzione che esegue il salto incondizionato (operatore JUMP)
+ *
+ * @param address --> L'indirizzo a cui saltare
+ */
 void execute_jump(int address){
 	pc = address;
 }
 
+/**
+ * Funzione che esegue l'istruzione per l'operatore LOCI per le costanti intere
+ *
+ * @param const_val --> L'intero da mettere nell'Instance stack
+ */
 void execute_loci(int const_val){
 	push_int(const_val);
 }
 
+/**
+ * Funzione che esegue l'istruzione per l'operatore LOCS per le costanti stringa
+ *
+ * @param const_val --> Puntatore da aggiungere nell'Instance Stack
+ */
 void execute_locs(char* const_val){
 	push_string(const_val);
 }
 
+/**
+ * Funzione che esegue l'istruzione per l'operatore UMIN, che fa l'opposto di un intero
+ */
 void execute_umin(){
 	int m = pop_int();
 	push_int(-m);
 }
 
+/**
+ * Funzione che esegue l'istruzione per l'operatore NEGA, che fa la negazione di un'espressione
+ */
 void execute_nega() {
 	int m = pop_int();
-	if(m==1) {
-		push_int(0);
-	}
-	else {
-		push_int(1);
-	}
+	// Se m non e' zero (vero), carico sull'Instance stack il valore 0 (falso), altrimenti carico il valore 1 (vero)
+	push_bool(m ? 0 : 1);
 }
 
-/*
 void execute_skip(int offset)
 {
 	pc += offset-1;
 }
+
 void execute_skpf(int offset)
 {
 	if(!pop_bool())
 		pc += offset-1;
 }
+
 void execute_retn()
 {
 	pc = top_astack()->retad;
 }
 
-//TODO check update variable 'ap' after return
-Arecord* top_astack(){
-	return astack[ap];
-}*/
-
+/**
+ * Funzione che esegue la somma tra due interi (operatore ADDI)
+ */
 void execute_addi()
 {
+	// Tolgo i due interi dall'Instance Stack e ci inserisco la somma
 	int n, m;
 	n = pop_int();
 	m = pop_int();
@@ -581,27 +729,39 @@ void execute_addi()
 	print_istack();
 }
 
+/**
+ * Funzione che esegue la sottrazione tra due interi (operatore SUBI)
+ */
 void execute_subi()
 {
+	// Tolgo i due interi dall'Instance Stack (prima il sottraendo, poi il minuendo) e ci inserisco la differenza
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m-n);
 }
 
+/**
+ * Funzione che esegue la moltiplicazione tra due interi (operatore MULI)
+ */
 void execute_muli()
 {
+	// Tolgo i due interi dall'Instance Stack e ci inserisco il prodotto
 	int n, m;
 	n = pop_int();
 	m = pop_int();
 	push_int(m*n);
 }
 
+/**
+ * Funzione che esegue la divisione tra due interi (operatore DIVI)
+ */
 void execute_divi()
 {
+	// Tolgo i due interi dall'Instance Stack (prima il divisore e poi il dividendo) e ci inserisco il quoziente
 	int n, m;
 	n = pop_int();
-	if(n==0)
+	if(n==0) // Controllo che non venga eseguita una divisione per zero (errore a runtime)
 		abstract_machine_Error("Error: Divide by 0");
 	m = pop_int();
 	push_int(m/n);
@@ -661,7 +821,7 @@ void execute_ileq() {
 void execute_sgrt() {
 	const char* s2 = pop_string();
 	const char* s1 = pop_string();
-	if(strcmp(s1,s2) == 1) { // s1 > s2
+	if(strcmp(s1,s2) >= 1) { // s1 > s2
 		push_bool(1);
 	}
 	else { // s1 <= s2
@@ -676,14 +836,12 @@ void execute_sgrt() {
 void execute_sgeq() {
 	const char* s2 = pop_string();
 	const char* s1 = pop_string();
-	if(strcmp(s1,s2) == -1) { // s1 < s2
+	if(strcmp(s1,s2) <= -1) { // s1 < s2
 		push_bool(0);
 	}
 	else { // s1 >= s2
 		push_bool(1);
 	}
-	printf("SGEQ:\n");
-	print_istack();
 }
 
 /**
@@ -693,7 +851,7 @@ void execute_sgeq() {
 void execute_slet() {
 	const char* s2 = pop_string();
 	const char* s1 = pop_string();
-	if(strcmp(s1,s2) == -1) { // s1 < s2
+	if(strcmp(s1,s2) <= -1) { // s1 < s2
 		push_bool(1);
 	}
 	else { // s1 >= s2
@@ -708,7 +866,7 @@ void execute_slet() {
 void execute_sleq() {
 	const char* s2 = pop_string();
 	const char* s1 = pop_string();
-	if(strcmp(s1,s2) == 1) { // s1 > s2
+	if(strcmp(s1,s2) >= 1) { // s1 > s2
 		push_bool(0);
 	}
 	else { // s1 <= s2
@@ -716,16 +874,24 @@ void execute_sleq() {
 	}
 }
 
+/**
+ * Funzione che implementa l'operatore ADEF per la definizione di tipi atomici
+ */
 void execute_adef(int size)
 {
+	// Creo l'Object Record da inserire nella prima posizione libera dell'Object stack
 	Orecord *po;
 	po = push_ostack();
 	po->type = ATOM;
 	po->size = size;
 }
 
+/**
+ * Funzione che implementa l'operatore SDEF per la definizione di tipi strutturati
+ */
 void execute_sdef(int size)
 {
+	// Creo l'Object Record da inserire nella prima posizione libera dell'Object stack
 	Orecord *po;
 	po = push_ostack();
 	po->type = VECTOR;
@@ -740,11 +906,14 @@ void execute_equa()
 {
 	unsigned char *n, *m;
 	int s1 = top_ostack()->size;
+	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
 	memcpy(&n, pop_n_istack(s1), s1);
 	pop_ostack();
 	int s2 = top_ostack()->size;
+	// Copio in m s2 bytes presi dalla cima dell'Instance Stack
 	memcpy(&m, pop_n_istack(s2), s2);
 	pop_ostack();
+	// Sull'Instance stack verra' messo il risultato dell'operatore == applicato ai due puntatori
 	push_bool(n==m);
 }
 
@@ -756,11 +925,14 @@ void execute_nequ()
 {
 	unsigned char *n, *m;
 	int s1 = top_ostack()->size;
+	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
 	memcpy(&n, pop_n_istack(s1), s1);
 	pop_ostack();
 	int s2 = top_ostack()->size;
+	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
 	memcpy(&m, pop_n_istack(s2), s2);
 	pop_ostack();
+	// Sull'Instance stack verra' messo il risultato dell'operatore == applicato ai due puntatori
 	push_bool(n!=m);
 }
 

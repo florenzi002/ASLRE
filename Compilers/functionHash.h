@@ -6,9 +6,8 @@
 
 /*
  * File:   functionsHash.h
- * Author: andrea
+ * Authors : Fabio Lorenzi & Cristian Sampietri
  *
- * Created on 23 maggio 2016, 18.22
  */
 
 #ifndef FUNCTIONSHASH_H
