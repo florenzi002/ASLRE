@@ -36,6 +36,7 @@ void execute_sleq();
 void execute_loci(int);
 void execute_locs(char*);
 void execute_store(int,int);
+void execute_load(int, int);
 void execute_adef(int);
 void execute_sdef(int);
 void execute_nega();
@@ -47,6 +48,7 @@ void pop_ostack();
 int pop_int();
 int pop_bool();
 int endian();
+void push_n_istack(unsigned char*, int);
 void push_int(int);
 Arecord *top_astack();
 Orecord *top_ostack();
@@ -384,6 +386,25 @@ int endian(){
 	return 1;      // Big Endian
 }
 
+void push_n_istack(unsigned char* bytes, int size) {
+	int p;
+	// A seconda dell'Endianess cambia l'ordine con cui i vari byte vengono memorizzati
+	if (ENDIANESS) { // Big Endian (la memorizzazione inizia dal byte piu' significativo)
+		p = 0;
+		// Memorizzo byte per byte nell'istack
+		for (; p < size; p++) {
+			push_istack();
+			*top_istack() = bytes[p];
+		}
+	} else { // Little Endian (la memorizzazione inizia dal byte meno significativo)
+		p = size - 1;
+		for (; p >= 0; p--) {
+			push_istack();
+			*top_istack() = bytes[p];
+		}
+	}
+}
+
 /**
  * Alloca memoria per un nuovo intero nell'istack e gli assegna un valore
  * @param i --> L'intero da mettere nell'Instance Stack
@@ -394,22 +415,7 @@ void push_int(int i){
 	top_ostack()->instance.sval=&(istack[ip]);
 	// Trasformo l'intero in sequenza di bytes
 	unsigned char *i_bytes=(unsigned char*)&i;
-	int p;
-	// A seconda dell'Endianess cambia l'ordine con cui i vari byte che formano l'intero vengono memorizzati
-	if(ENDIANESS){ // Big Endian (la memorizzazione inizia dal byte piu' significativo)
-		p=0;
-		// Memorizzo byte per byte nell'istack
-		for(;p<INTSIZE;p++){
-			push_istack();
-			*top_istack()=i_bytes[p];
-		}
-	}else{ // Little Endian (la memorizzazione inizia dal byte meno significativo)
-		p=INTSIZE-1;
-		for(;p>=0;p--){
-			push_istack();
-			*top_istack()=i_bytes[p];
-		}
-	}
+	push_n_istack(i_bytes, INTSIZE);
 }
 
 /**
@@ -423,23 +429,7 @@ void push_string(char* s){
 	top_ostack()->instance.sval=&(istack[ip]);
 	// Converto in una sequenza di bytes
 	unsigned char *s_bytes=(unsigned char*)&s;
-	int p;
-	// A seconda dell'Endianess cambia l'ordine con cui i vari byte che formano il puntatore vengono memorizzati
-	if(ENDIANESS){ // Big Endian (la memorizzazione inizia dal byte piu' significativo)
-		p=0;
-		// Memorizzo byte per byte nell'istack
-		for(;p<PTRSIZE;p++){
-			push_istack();
-			*top_istack()=s_bytes[p];
-		}
-	}else{ // Little Endian (la memorizzazione inizia dal byte meno significativo)
-		p=PTRSIZE-1;
-		// Memorizzo byte per byte nell'istack
-		for(;p>=0;p--){
-			push_istack();
-			*top_istack()=s_bytes[p];
-		}
-	}
+	push_n_istack(s_bytes, PTRSIZE);
 }
 
 /**
@@ -575,8 +565,8 @@ void execute(Acode *instruction)
 	//case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
 	case LOCS: execute_locs(instruction->operands[0].sval); break;
-	/*case LOAD: execute_load(); break;
-	case PACK: execute_pack(); break;
+	case LOAD: execute_load(instruction->operands[0].ival, instruction->operands[1].ival); break;
+	/*case PACK: execute_pack(); break;
 	case LODA: execute_loda(); break;
 	case IXAD: execute_ixad(); break;
 	case AIND: execute_aind(); break;
@@ -633,6 +623,22 @@ void execute_store(int chain, int oid) {
 	// Rimuovo l'Object Record dalla cima dell'Object Stack
 	pop_ostack();
 	memcpy(&(p_obj->instance),bytes, size);
+}
+
+void execute_load(int chain, int oid){
+	Arecord* target_ar = top_astack();
+	int i=0;
+	// Tramite l'access link, risalgo di un numero di Activation Record pari a quello specificato nel parametro chain
+	for(; i<chain; i++) {
+		target_ar = target_ar->al;
+	}
+	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
+	Orecord* p_obj = *(target_ar->head + oid);
+
+	execute_adef(p_obj->size);
+	top_ostack()->instance.sval=&(istack[ip]);
+
+	push_n_istack((unsigned char*)&(p_obj->instance), p_obj->size);
 }
 
 /**
@@ -941,7 +947,7 @@ void print_ostack(){
 	printf("# objects on ostack: %d\n", op);
 	for(i=0; i<op; i++){
 		printf("size of object: %d\n", ostack[i]->size);
-		printf("value of object: %s\n", ostack[i]->instance.sval);
+		//printf("value of object: %s\n", ostack[i]->instance.sval);
 	}
 }
 
