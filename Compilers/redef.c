@@ -37,8 +37,10 @@ void execute_loci(int);
 void execute_locs(char*);
 void execute_store(int,int);
 void execute_load(int, int);
+void execute_loda(int, int);
 void execute_adef(int);
 void execute_sdef(int);
+void execute_pack(int, int);
 void execute_nega();
 void execute_umin();
 void execute_nequ();
@@ -224,6 +226,9 @@ void start_abstract_machine()
  */
 void stop_abstract_machine()
 {
+	print_ostack();
+	print_istack();
+
 	// Viene liberata la memoria allocata
 	freemem((char*) program, sizeof(Acode) * code_size);
 	freemem((char*) astack, sizeof(Arecord*) * asize);
@@ -235,6 +240,7 @@ void stop_abstract_machine()
 	printf("Allocation: %ld bytes\n", allocated);
 	printf("Deallocation: %ld bytes\n", deallocated);
 	printf("Residue: %ld bytes\n", allocated - deallocated);
+
 }
 
 /**
@@ -412,7 +418,7 @@ void push_n_istack(unsigned char* bytes, int size) {
 void push_int(int i){
 	// Chiamo ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione di un intero
 	execute_adef(INTSIZE);
-	top_ostack()->instance.sval=&(istack[ip]);
+	top_ostack()->instance.ival=ip;
 	// Trasformo l'intero in sequenza di bytes
 	unsigned char *i_bytes=(unsigned char*)&i;
 	push_n_istack(i_bytes, INTSIZE);
@@ -426,7 +432,7 @@ void push_int(int i){
 void push_string(char* s){
 	// Chiamo l'ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione in bytes di un puntatore
 	execute_adef(PTRSIZE);
-	top_ostack()->instance.sval=&(istack[ip]);
+	top_ostack()->instance.ival=ip;
 	// Converto in una sequenza di bytes
 	unsigned char *s_bytes=(unsigned char*)&s;
 	push_n_istack(s_bytes, PTRSIZE);
@@ -562,13 +568,13 @@ void execute(Acode *instruction)
 	case JUMP: execute_jump(instruction->operands[0].ival); break;
 	case APOP: pop_activation_record(); break;
 	case ADEF: execute_adef(instruction->operands[0].ival); break;
-	//case SDEF: execute_sdef(instruction->operands[0].ival); break;
+	case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
 	case LOCS: execute_locs(instruction->operands[0].sval); break;
 	case LOAD: execute_load(instruction->operands[0].ival, instruction->operands[1].ival); break;
-	/*case PACK: execute_pack(); break;
-	case LODA: execute_loda(); break;
-	case IXAD: execute_ixad(); break;
+	case PACK: execute_pack(instruction->operands[0].ival, instruction->operands[1].ival); break;
+	case LODA: execute_loda(instruction->operands[0].ival, instruction->operands[1].ival); break;
+	/*case IXAD: execute_ixad(); break;
 	case AIND: execute_aind(); break;
 	case SIND: execute_sind(); break; */
 	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
@@ -636,9 +642,22 @@ void execute_load(int chain, int oid){
 	Orecord* p_obj = *(target_ar->head + oid);
 
 	execute_adef(p_obj->size);
-	top_ostack()->instance.sval=&(istack[ip]);
+	top_ostack()->instance.ival=ip;
 
 	push_n_istack((unsigned char*)&(p_obj->instance), p_obj->size);
+}
+
+void execute_loda(int chain, int oid){
+	Arecord* target_ar = top_astack();
+	int i=0;
+	// Tramite l'access link, risalgo di un numero di Activation Record pari a quello specificato nel parametro chain
+	for(; i<chain; i++) {
+		target_ar = target_ar->al;
+	}
+	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
+	Orecord* p_obj = *(target_ar->head + oid);
+
+	push_int(p_obj->instance.ival);
 }
 
 /**
@@ -904,6 +923,17 @@ void execute_sdef(int size)
 	po->size = size;
 }
 
+void execute_pack(int n_elem, int sizeof_elem){
+	int i=0;
+	for(;i<n_elem;i++){
+		pop_ostack();
+	}
+	int bytes = n_elem*sizeof_elem;
+	execute_sdef(bytes);
+	top_ostack()->instance.ival = ip-bytes;
+	push_int(ip-bytes);
+}
+
 /**
  * Confronta due oggetti (operatore ==): se questi sono uguali, carica nell'instance stack il valore 1, altrimenti carica
  * il valore 0
@@ -945,9 +975,11 @@ void execute_nequ()
 void print_ostack(){
 	int i;
 	printf("# objects on ostack: %d\n", op);
+	printf("---------------------------------------\n");
 	for(i=0; i<op; i++){
 		printf("size of object: %d\n", ostack[i]->size);
-		//printf("value of object: %s\n", ostack[i]->instance.sval);
+		printf("value of object: %d\n", ostack[i]->instance.ival);
+		printf("---------------------------------------\n");
 	}
 }
 
