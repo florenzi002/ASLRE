@@ -38,6 +38,8 @@ void execute_locs(char*);
 void execute_store(int,int);
 void execute_load(int, int);
 void execute_loda(int, int);
+void execute_aind(int);
+void execute_ixad(int);
 void execute_adef(int);
 void execute_sdef(int);
 void execute_pack(int, int);
@@ -511,6 +513,27 @@ unsigned char *pop_n_istack(int n){
 	return i_bytes;
 }
 
+unsigned char *load_n_istack(int n, int start){
+	unsigned char *i_bytes = malloc(n*sizeof(char));
+	int p = 0;
+	// Risalgo nell'Instance Stack del numero di posizioni necessario per recuperare la prima
+	char *q = &istack[start];
+	for(;p<n;p++){
+		// A ciascun byte di i_bytes assegno il valore di ciò che punta q
+		i_bytes[p]=*(q++);
+	}
+	if(!ENDIANESS){ // Little Endian
+		int i=-1;
+		// Inverto il contenuto dell'array
+		while((++i)<(--p)){
+			unsigned char temp = i_bytes[i];
+			i_bytes[i]=i_bytes[p];
+			i_bytes[p]=temp;
+		}
+	}
+	return i_bytes;
+}
+
 /**
  * Funzione che recupera un intero a partire dalla cima dell'Instance Stack
  *
@@ -574,9 +597,9 @@ void execute(Acode *instruction)
 	case LOAD: execute_load(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case PACK: execute_pack(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case LODA: execute_loda(instruction->operands[0].ival, instruction->operands[1].ival); break;
-	/*case IXAD: execute_ixad(); break;
-	case AIND: execute_aind(); break;
-	case SIND: execute_sind(); break; */
+	case IXAD: execute_ixad(instruction->operands[0].ival); break;
+	case AIND: execute_aind(instruction->operands[0].ival); break;
+	//case SIND: execute_sind(); break;
 	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case IGRT: execute_igrt(); break;
 	case IGEQ: execute_igeq(); break;
@@ -656,7 +679,6 @@ void execute_loda(int chain, int oid){
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
-
 	push_int(p_obj->instance.ival);
 }
 
@@ -932,6 +954,24 @@ void execute_pack(int n_elem, int sizeof_elem){
 	execute_sdef(bytes);
 	top_ostack()->instance.ival = ip-bytes;
 	push_int(ip-bytes);
+}
+
+void execute_ixad(int sizeof_elem){
+	int position = pop_int();
+	int start_addr = pop_int();
+	int dest_addr = start_addr + sizeof_elem*position;
+	//TODO check outofbound
+	push_int(dest_addr);
+}
+
+void execute_aind(int sizeof_elem){
+	int start_addr = pop_int();
+	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
+	//TODO check outofbound
+	execute_adef(sizeof_elem);
+	top_ostack()->instance.ival=ip;
+	push_n_istack(bytes, sizeof_elem);
+	free(bytes);
 }
 
 /**
