@@ -415,6 +415,24 @@ void push_n_istack(unsigned char* bytes, int size) {
 	}
 }
 
+void write_n_istack(unsigned char* bytes, int size, int start_p){
+	int p, s=start_p;
+	// A seconda dell'Endianess cambia l'ordine con cui i vari byte vengono memorizzati
+	if (ENDIANESS) { // Big Endian (la memorizzazione inizia dal byte piu' significativo)
+		p = 0;
+		// Memorizzo byte per byte nell'istack
+		for (; p < size; p++) {
+			istack[s++] = *(bytes+p);
+		}
+	} else { // Little Endian (la memorizzazione inizia dal byte meno significativo)
+		p = size - 1;
+		for (; p >= 0; p--) {
+			//printf("%d", bytes[p]);
+			istack[s++] = bytes[p];
+		}
+	}
+}
+
 /**
  * Alloca memoria per un nuovo intero nell'istack e gli assegna un valore
  * @param i --> L'intero da mettere nell'Instance Stack
@@ -552,7 +570,7 @@ int pop_int(){
 	}
 	// TODO freemem o free?
 	freemem((char *)i_bytes, INTSIZE);
-	printf("INTEGER: %d\n", res);
+	//printf("INTEGER: %d\n", res);
 	return res;
 }
 
@@ -652,7 +670,10 @@ void execute_store(int chain, int oid) {
 	unsigned char *bytes = pop_n_istack(size);
 	// Rimuovo l'Object Record dalla cima dell'Object Stack
 	pop_ostack();
-	memcpy(&(p_obj->instance),bytes, size);
+	if(p_obj->type==ATOM)
+		memcpy(&(p_obj->instance),bytes, size);
+	else
+		write_n_istack(bytes,size,p_obj->instance.ival);
 }
 
 /**
@@ -980,6 +1001,10 @@ void execute_sdef(int size)
 	po = push_ostack();
 	po->type = VECTOR;
 	po->size = size;
+	po->instance.ival=ip;
+	int i = 0;
+	for(;i<size;i++)
+		push_istack();
 }
 
 /**
@@ -989,15 +1014,16 @@ void execute_sdef(int size)
  * @param sizeof_elem --> La dimensione del singolo elemento dell'array
  */
 void execute_pack(int n_elem, int sizeof_elem){
-	// TODO e' corretta?? Se si, aggiungere documentazione
 	int i=0;
 	for(;i<n_elem;i++){
 		pop_ostack();
 	}
 	int bytes = n_elem*sizeof_elem;
-	execute_sdef(bytes);
-	top_ostack()->instance.ival = ip-bytes;
-	push_int(ip-bytes);
+	Orecord *po;
+	po = push_ostack();
+	po->type = VECTOR;
+	po->size = bytes;
+	po->instance.ival=ip-bytes;
 }
 
 /**
@@ -1056,12 +1082,12 @@ void execute_read(int chain, int oid, char* format) {
  */
 void execute_writ(char* format) {
 	// A seconda del formato dell'oggetto da stampare, viene chiamata la funzione printf con lo specificatore di formato appropriato
-	if(strcmp(format,INTFORMAT) || strcmp(format,BOOLFORMAT)) {
+	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
 		// Stampo un intero (recuperandolo dall'Instance Stack)
 		int num = pop_int();
 		printf("Oggetto: %d\n", num);
 	}
-	else if(strcmp(format, STRFORMAT)){
+	else{
 		char* str = pop_string();
 		printf("Oggetto: %s\n", str);
 	}

@@ -22,6 +22,7 @@ int hash(char *id){
 Nodo *creaNodo(char *id){
     Nodo *nuovoNodo = malloc(sizeof(Nodo));
     nuovoNodo->stringa = malloc(strlen(id)+1);
+    nuovoNodo->fratello = NULL;
     strcpy(nuovoNodo->stringa, id);
     return nuovoNodo;
 }
