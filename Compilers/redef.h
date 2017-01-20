@@ -12,6 +12,9 @@
 // Costanti a cui viene assegnata la dimensione di un intero e di un puntatore, relativamente alla macchina in uso
 #define INTSIZE sizeof(int)
 #define PTRSIZE sizeof(void *)
+#define INTFORMAT "i"
+#define STRFORMAT "s"
+#define BOOLFORMAT "b"
 
 // Enum contenente tutti i possibili operatori
 typedef enum {

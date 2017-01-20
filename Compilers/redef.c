@@ -40,6 +40,8 @@ void execute_load(int, int);
 void execute_loda(int, int);
 void execute_aind(int);
 void execute_ixad(int);
+void execute_read(int, int, char*);
+void execute_writ(char*);
 void execute_adef(int);
 void execute_sdef(int);
 void execute_pack(int, int);
@@ -609,24 +611,23 @@ void execute(Acode *instruction)
 	case SGEQ: execute_sgeq(); break;
 	case SLET: execute_slet(); break;
 	case SLEQ: execute_sleq(); break;
-	/*case ISTO: execute_isto(); break;
-	case SKIP: execute_skip(); break;
-	case SKPF: execute_skpf(); break;
-	 */
+	/*case ISTO: execute_isto(); break;*/
+	case SKIP: execute_skip(instruction->operands[0].ival); break;
+	case SKPF: execute_skpf(instruction->operands[0].ival); break;
 	case EQUA: execute_equa(); break;
 	case NEQU: execute_nequ(); break;
 	case ADDI: execute_addi(); break;
 	case SUBI: execute_subi(); break;
 	case MULI: execute_muli(); break;
 	case DIVI: execute_divi(); break;
-
 	case UMIN: execute_umin(); break;
 	case NEGA: execute_nega(); break;
-	/**case READ: execute_read(); break;
-	case MODL: execute_modl(): break;
-	case NOOP: execute_noop(); break;
+	case READ: execute_read(instruction->operands[0].ival, instruction->operands[1].ival, instruction->operands[2].sval); break;
+	case WRIT: execute_writ(instruction->operands[0].sval); break;
+	/**case MODL: execute_modl(): break;
+	case NOOP: execute_noop(); break; */
 	// TODO
-	case RETN: execute_retn(); break;*/
+	case RETN: execute_retn(); break;
 	default: abstract_machine_Error("Unknown operator"); break;
 	}
 }
@@ -654,8 +655,15 @@ void execute_store(int chain, int oid) {
 	memcpy(&(p_obj->instance),bytes, size);
 }
 
+/**
+ * Funzione che esegue l'istruzione LOAD per referenziare un identificatore
+ *
+ * @param chain --> Indica la distanza, cioe' di quanti Activation Record dobbiamo risalire per arrivare all'ambiente in
+ *                  cui l'identificatore e' definito (se e' 0, allora l'oggetto e' locale)
+ * @param oid --> Identificatore dell'oggetto (al fine di recuperarlo dall'Object Stack)
+ */
 void execute_load(int chain, int oid){
-	Arecord* target_ar = top_astack();
+	Arecord* target_ar = top_astack(); // Variabile che dovra' contenere l'Activation Record corrispondente all'ambiente in cui l'oggetto e' definito
 	int i=0;
 	// Tramite l'access link, risalgo di un numero di Activation Record pari a quello specificato nel parametro chain
 	for(; i<chain; i++) {
@@ -664,12 +672,22 @@ void execute_load(int chain, int oid){
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 
+	// Definisco l'oggetto nell'Object Stack, specificandone la dimensione
 	execute_adef(p_obj->size);
-	top_ostack()->instance.ival=ip;
 
+	// Metto nell'ival il valore dell'Instance Pointer e aggiungo l'indirizzo nell'Instance Stack
+	top_ostack()->instance.ival=ip;
 	push_n_istack((unsigned char*)&(p_obj->instance), p_obj->size);
 }
 
+/**
+ * Funzione che esegue l'istruzione LODA per caricare l'indirizzo di un'istanza di un array
+ *
+ * @param chain --> Indica la distanza, cioe' di quanti Activation Record dobbiamo risalire per arrivare all'ambiente in
+ *                  cui l'array e' definito (se e' 0, allora l'oggetto e' locale)
+ *
+ * @param oid --> Identificatore dell'oggetto (al fine di recuperarlo dall'Object Stack)
+ */
 void execute_loda(int chain, int oid){
 	Arecord* target_ar = top_astack();
 	int i=0;
@@ -679,6 +697,7 @@ void execute_loda(int chain, int oid){
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
+	// Metto sull'Instance Stack il contenuto del campo ival di quell'oggetto
 	push_int(p_obj->instance.ival);
 }
 
@@ -746,19 +765,33 @@ void execute_nega() {
 	push_bool(m ? 0 : 1);
 }
 
+/**
+ * Funzione che esegue l'istruzione SKIP per eseguire l'unconditional relative jump
+ *
+ * @param offset --> Specifica di quante istruzioni bisogna saltare
+ */
 void execute_skip(int offset)
 {
 	pc += offset-1;
 }
 
+/**
+ * Funzione che esegue l'istruzione SKPF per eseguire il conditional relative jump
+ *
+ * @param offset --> Specifica di quante istruzioni bisogna saltare
+ */
 void execute_skpf(int offset)
 {
 	if(!pop_bool())
 		pc += offset-1;
 }
 
+/**
+ * Funzione che esegue l'istruzione RETN per eseguire il return al termine di una funzione o procedura
+ */
 void execute_retn()
 {
+	// Setto il Program Counter con il Return Address dell'Activation Record in cima allo stack
 	pc = top_astack()->retad;
 }
 
@@ -923,6 +956,8 @@ void execute_sleq() {
 
 /**
  * Funzione che implementa l'operatore ADEF per la definizione di tipi atomici
+ *
+ * @param size --> La dimensione del tipo atomico
  */
 void execute_adef(int size)
 {
@@ -935,6 +970,8 @@ void execute_adef(int size)
 
 /**
  * Funzione che implementa l'operatore SDEF per la definizione di tipi strutturati
+ *
+ * @param size --> La dimensione del tipo strutturato
  */
 void execute_sdef(int size)
 {
@@ -945,7 +982,14 @@ void execute_sdef(int size)
 	po->size = size;
 }
 
+/**
+ * Funzione che implementa l'operatore PACK per aggregare tutti gli elementi di un array in un unico oggetto array
+ *
+ * @param n_elem --> Il numero di elementi dell'array
+ * @param sizeof_elem --> La dimensione del singolo elemento dell'array
+ */
 void execute_pack(int n_elem, int sizeof_elem){
+	// TODO e' corretta?? Se si, aggiungere documentazione
 	int i=0;
 	for(;i<n_elem;i++){
 		pop_ostack();
@@ -956,14 +1000,24 @@ void execute_pack(int n_elem, int sizeof_elem){
 	push_int(ip-bytes);
 }
 
+/**
+ * Funzione che implementa l'operatore IXAD per il caricamento dell'indirizzo di un elemento dell'array
+ *
+ * @param sizeof_elem --> La dimensione dell'elemento
+ */
 void execute_ixad(int sizeof_elem){
-	int position = pop_int();
-	int start_addr = pop_int();
-	int dest_addr = start_addr + sizeof_elem*position;
+	int position = pop_int(); // Posizione all'interno dell'array dell'elemento da caricare
+	int start_addr = pop_int(); // Indirizzo di partenza dell'array
+	int dest_addr = start_addr + sizeof_elem*position; // Calcola la posizione dell'elemento da caricare
 	//TODO check outofbound
-	push_int(dest_addr);
+	push_int(dest_addr);   // Aggiunge la posizione calcolata nell'Instance Stack
 }
 
+/**
+ * Funzione che implementa l'operatore AIND per effettuare l'indirect load di un oggetto di tipo atomico
+ *
+ * @param sizeof_elem --> La dimensione dell'elemento
+ */
 void execute_aind(int sizeof_elem){
 	int start_addr = pop_int();
 	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
@@ -972,6 +1026,45 @@ void execute_aind(int sizeof_elem){
 	top_ostack()->instance.ival=ip;
 	push_n_istack(bytes, sizeof_elem);
 	free(bytes);
+}
+
+/**
+ * Funzione che implementa l'operatore READ per lo statement di input
+ *
+ * @param chain --> Indica la distanza nella catena statica, cioe' di quanti Activation record bisogna risalire per
+ *                  trovare l'ambiente in cui la l'oggetto da assegnare e' definito
+ * @param oid --> Identificatore dell'oggetto (necessario per recuperare l'oggetto da assegnare tra quelli relativi
+ *                all' Activation Record
+ *
+ * @param format --> Stringa che specifica il formato secondo cui deve essere letto l'input
+ */
+void execute_read(int chain, int oid, char* format) {
+	Arecord* target_ar = top_astack();
+	int i=0;
+	// Tramite l'access link, risalgo di un numero di Activation Record pari a quello specificato nel parametro chain
+	for(; i<chain; i++) {
+		target_ar = target_ar->al;
+	}
+	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
+	Orecord* p_obj = *(target_ar->head + oid);
+}
+
+/**
+ * Funzione che implementa l'operatore WRIT per l'output statement (stampa a video di un oggetto)
+ *
+ * @param format --> Stringa che specifica il formato dell'oggetto da stampare
+ */
+void execute_writ(char* format) {
+	// A seconda del formato dell'oggetto da stampare, viene chiamata la funzione printf con lo specificatore di formato appropriato
+	if(strcmp(format,INTFORMAT) || strcmp(format,BOOLFORMAT)) {
+		// Stampo un intero (recuperandolo dall'Instance Stack)
+		int num = pop_int();
+		printf("Oggetto: %d\n", num);
+	}
+	else if(strcmp(format, STRFORMAT)){
+		char* str = pop_string();
+		printf("Oggetto: %s\n", str);
+	}
 }
 
 /**
