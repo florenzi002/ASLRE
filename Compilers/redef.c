@@ -40,6 +40,7 @@ void execute_load(int, int);
 void execute_loda(int, int);
 void execute_aind(int);
 void execute_ixad(int);
+void execute_isto();
 void execute_read(int, int, char*);
 void execute_writ(char*);
 void execute_adef(int);
@@ -135,6 +136,7 @@ long allocated = 0, deallocated = 0; // Variabili che tengono traccia della memo
  * un array
  */
 void load_acode(){
+
 	// Apertura in lettura del file con l'Acode
 	FILE *file = fopen("./my_program.txt", "r");
 	char str[LINEDIM];
@@ -440,10 +442,7 @@ void write_n_istack(unsigned char* bytes, int size, int start_p){
 void push_int(int i){
 	// Chiamo ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione di un intero
 	execute_adef(INTSIZE);
-	top_ostack()->instance.ival=ip;
-	// Trasformo l'intero in sequenza di bytes
-	unsigned char *i_bytes=(unsigned char*)&i;
-	push_n_istack(i_bytes, INTSIZE);
+	top_ostack()->instance.ival=i;
 }
 
 /**
@@ -454,10 +453,7 @@ void push_int(int i){
 void push_string(char* s){
 	// Chiamo l'ADEF per creare l'oggetto nell'Object Stack, passandogli come parametro la dimensione in bytes di un puntatore
 	execute_adef(PTRSIZE);
-	top_ostack()->instance.ival=ip;
-	// Converto in una sequenza di bytes
-	unsigned char *s_bytes=(unsigned char*)&s;
-	push_n_istack(s_bytes, PTRSIZE);
+	top_ostack()->instance.sval=s;
 }
 
 /**
@@ -560,17 +556,8 @@ unsigned char *load_n_istack(int n, int start){
  * @return --> L'intero recuperato dall'Instance Stack
  */
 int pop_int(){
-	// Chiamo la funzione per recuperare dalla cima dell'Instance Stack un numero di bytes pari a INTSIZE (che in genere e' 4)
-	unsigned char *i_bytes = pop_n_istack(INTSIZE);
-	// Rimuovo l'Object Record associato all'intero recuperato
+	int res = top_ostack()->instance.ival;
 	pop_ostack();
-	int i=0,res=0;
-	for(;i<INTSIZE;i++){
-		res = res|(i_bytes[i])<<(ENDIANESS?(24-8*i):(8*i));
-	}
-	// TODO freemem o free?
-	freemem((char *)i_bytes, INTSIZE);
-	//printf("INTEGER: %d\n", res);
 	return res;
 }
 
@@ -580,16 +567,9 @@ int pop_int(){
  * @return --> Puntatore alla stringa recuperata
  */
 char* pop_string(){
-	// Chiamo la funzione per recuperare dalla cima dell'Instance Stack un numero di bytes pari a PTRSIZE
-	unsigned char *i_bytes = pop_n_istack(PTRSIZE);
-	// Rimuovo l'Object Record associato al puntatore
+	char* res = top_ostack()->instance.sval;
 	pop_ostack();
-	// Alloco la memoria per il puntatore alla stringa da restituire
-	char* s = malloc(PTRSIZE);
-	// Copio PTRSIZE bytes da i_bytes all'indirizzo di s
-	memcpy(&s,i_bytes,PTRSIZE);
-	freemem((char *)i_bytes, PTRSIZE);
-	return s;
+	return res;
 }
 
 int pop_bool(){
@@ -629,7 +609,7 @@ void execute(Acode *instruction)
 	case SGEQ: execute_sgeq(); break;
 	case SLET: execute_slet(); break;
 	case SLEQ: execute_sleq(); break;
-	/*case ISTO: execute_isto(); break;*/
+	case ISTO: execute_isto(); break;
 	case SKIP: execute_skip(instruction->operands[0].ival); break;
 	case SKPF: execute_skpf(instruction->operands[0].ival); break;
 	case EQUA: execute_equa(); break;
@@ -666,14 +646,16 @@ void execute_store(int chain, int oid) {
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 	int size = top_ostack()->size;
-	// Recupero dall'istack un numero di bytes specificato dal campo size dell'Orecord
-	unsigned char *bytes = pop_n_istack(size);
+
+	if(p_obj->type==ATOM)
+		memcpy(&(p_obj->instance),&(top_ostack()->instance), size);
+	else{
+		// Recupero dall'istack un numero di bytes specificato dal campo size dell'Orecord
+		unsigned char *bytes = pop_n_istack(size);
+		write_n_istack(bytes,size,p_obj->instance.ival);
+	}
 	// Rimuovo l'Object Record dalla cima dell'Object Stack
 	pop_ostack();
-	if(p_obj->type==ATOM)
-		memcpy(&(p_obj->instance),bytes, size);
-	else
-		write_n_istack(bytes,size,p_obj->instance.ival);
 }
 
 /**
@@ -692,13 +674,9 @@ void execute_load(int chain, int oid){
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
-
 	// Definisco l'oggetto nell'Object Stack, specificandone la dimensione
 	execute_adef(p_obj->size);
-
-	// Metto nell'ival il valore dell'Instance Pointer e aggiungo l'indirizzo nell'Instance Stack
-	top_ostack()->instance.ival=ip;
-	push_n_istack((unsigned char*)&(p_obj->instance), p_obj->size);
+	memcpy(&(top_ostack()->instance), &(p_obj->instance), p_obj->size);
 }
 
 /**
@@ -1014,11 +992,14 @@ void execute_sdef(int size)
  * @param sizeof_elem --> La dimensione del singolo elemento dell'array
  */
 void execute_pack(int n_elem, int sizeof_elem){
-	int i=0;
+	int i=0, bytes = n_elem*sizeof_elem;
+	unsigned char* byte_arr = malloc(bytes);
 	for(;i<n_elem;i++){
+		memcpy((byte_arr+(i*sizeof_elem)),&(top_ostack()->instance), sizeof_elem);
 		pop_ostack();
 	}
-	int bytes = n_elem*sizeof_elem;
+	push_n_istack(byte_arr, bytes);
+	free(byte_arr);
 	Orecord *po;
 	po = push_ostack();
 	po->type = VECTOR;
@@ -1047,11 +1028,26 @@ void execute_ixad(int sizeof_elem){
 void execute_aind(int sizeof_elem){
 	int start_addr = pop_int();
 	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
-	//TODO check outofbound
 	execute_adef(sizeof_elem);
-	top_ostack()->instance.ival=ip;
-	push_n_istack(bytes, sizeof_elem);
+	memcpy(&(top_ostack()->instance), bytes, sizeof_elem);
 	free(bytes);
+}
+
+void execute_sind(int sizeof_elem){
+	//TODO ask Bettinelli form of generated Code
+}
+
+void execute_isto(){
+	Orecord *obj = malloc(sizeof(Orecord));
+	*obj=*top_ostack();
+	pop_ostack();
+	int addr = pop_int();
+	printf("OBJECT SIZE: %d\n", obj->instance.ival);
+	if(obj->type==ATOM){
+		unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
+		memcpy(bytes, &(obj->instance), obj->size);
+		write_n_istack(bytes, obj->size, addr);
+	}
 }
 
 /**
