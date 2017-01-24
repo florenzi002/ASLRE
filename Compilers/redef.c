@@ -717,11 +717,12 @@ void execute_push(int num_formals_aux, int num_loc, int chain){
 	ar->objects = num_loc+num_formals_aux;
 	// Il return address viene settato come program-counter+1
 	ar->retad = pc+1;
-	if(chain<=0)
+	if(chain<0)
 		ar->al=NULL;
-	else{
+	else if(chain==0)
+		ar->al = astack[ap-2];
+	else
 		ar->al = astack[ap-chain-1];
-	}
 }
 
 /**
@@ -1098,17 +1099,13 @@ void execute_writ(char* format) {
  */
 void execute_equa()
 {
-	unsigned char *n, *m;
+	Orecord obj1, obj2;
 	int s1 = top_ostack()->size;
-	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
-	memcpy(&n, &(top_ostack()->instance), s1);
+	obj1 = *top_ostack();
 	pop_ostack();
-	int s2 = top_ostack()->size;
-	// Copio in m s2 bytes presi dalla cima dell'Instance Stack
-	memcpy(&m, &(top_ostack()->instance), s2);
+	obj2 = *top_ostack();
 	pop_ostack();
-	// Sull'Instance stack verra' messo il risultato dell'operatore == applicato ai due puntatori
-	push_bool(n==m);
+	push_bool(memcmp(&obj1.instance, &obj2.instance, s1)==0);
 }
 
 /**
@@ -1117,17 +1114,13 @@ void execute_equa()
  */
 void execute_nequ()
 {
-	unsigned char *n, *m;
+	Orecord *obj1, *obj2;
 	int s1 = top_ostack()->size;
-	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
-	memcpy(&n, pop_n_istack(s1), s1);
+	obj1 = top_ostack();
 	pop_ostack();
-	int s2 = top_ostack()->size;
-	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
-	memcpy(&m, pop_n_istack(s2), s2);
+	obj2 = top_ostack();
 	pop_ostack();
-	// Sull'Instance stack verra' messo il risultato dell'operatore == applicato ai due puntatori
-	push_bool(n!=m);
+	push_bool(memcmp(&obj1->instance, &obj2->instance, s1)!=0);
 }
 
 void print_ostack(){
