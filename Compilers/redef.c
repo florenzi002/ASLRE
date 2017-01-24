@@ -113,9 +113,9 @@ char* s_op_code[] = {
 };
 
 // Costanti che indicano per quanti elementi bisogna allocare memoria, rispettivamente, per Astack, Ostack e Istack
-const int ASEGMENT = 10;
-const int OSEGMENT = 10;
-const int ISEGMENT = 10;
+const int ASEGMENT = 128;
+const int OSEGMENT = 512;
+const int ISEGMENT = 128;
 
 const int LINEDIM = 128;
 
@@ -324,8 +324,9 @@ Arecord *top_astack(){
 Orecord *push_ostack(){
 	Orecord **full_ostack;
 	int i;
-	if(op == osize) // Verifico se l'Obect Stack e' pieno
+	if(op == osize) // Verifico se l'Object Stack e' pieno
 	{
+		abstract_machine_Error("Failure allocating more space");
 		// Devo allocare nuovamente la memoria, quindi copio l'astack nella variabile temporanea
 		full_ostack = ostack;
 		// Alloco nuova memoria per l'ostack
@@ -348,7 +349,7 @@ Orecord *push_ostack(){
  */
 Orecord *top_ostack(){
 	if (op==0) { // Errore: Object Stack vuoto
-		abstract_machine_Error("Failure accessing top of Activation Stack");
+		abstract_machine_Error("Failure accessing top of Object Stack");
 	}
 	return ostack[op-1];
 }
@@ -718,6 +719,9 @@ void execute_push(int num_formals_aux, int num_loc, int chain){
 	ar->retad = pc+1;
 	if(chain<=0)
 		ar->al=NULL;
+	else{
+		ar->al = astack[ap-chain-1];
+	}
 }
 
 /**
@@ -804,8 +808,6 @@ void execute_addi()
 	n = pop_int();
 	m = pop_int();
 	push_int(m+n);
-	print_ostack();
-	print_istack();
 }
 
 /**
@@ -856,6 +858,7 @@ void execute_igrt()
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
+	print_istack();
 }
 
 /**
@@ -1098,11 +1101,11 @@ void execute_equa()
 	unsigned char *n, *m;
 	int s1 = top_ostack()->size;
 	// Copio in n s1 bytes presi dalla cima dell'Instance Stack
-	memcpy(&n, pop_n_istack(s1), s1);
+	memcpy(&n, &(top_ostack()->instance), s1);
 	pop_ostack();
 	int s2 = top_ostack()->size;
 	// Copio in m s2 bytes presi dalla cima dell'Instance Stack
-	memcpy(&m, pop_n_istack(s2), s2);
+	memcpy(&m, &(top_ostack()->instance), s2);
 	pop_ostack();
 	// Sull'Instance stack verra' messo il risultato dell'operatore == applicato ai due puntatori
 	push_bool(n==m);
