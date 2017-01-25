@@ -39,6 +39,7 @@ void execute_store(int,int);
 void execute_load(int, int);
 void execute_loda(int, int);
 void execute_aind(int);
+void execute_sind(int);
 void execute_ixad(int);
 void execute_isto();
 void execute_read(int, int, char*);
@@ -50,6 +51,7 @@ void execute_nega();
 void execute_umin();
 void execute_nequ();
 void execute_equa();
+void execute_apop();
 unsigned char *pop_n_istack(int);
 void pop_ostack();
 int pop_int();
@@ -584,13 +586,13 @@ int pop_bool(){
  */
 void execute(Acode *instruction)
 {
-	// printf("%d - %s\n", instruction->operator, s_op_code[instruction->operator]);
+	//printf("istr: %d|%d - %s\n", pc+1,instruction->operator, s_op_code[instruction->operator]);
 	// A seconda dell'operatore, chiamo la funzione che esegue la corrispondente istruzione
 	switch(instruction->operator)
 	{
 	case PUSH: execute_push(instruction->operands[0].ival, instruction->operands[1].ival, instruction->operands[2].ival); break;
 	case JUMP: execute_jump(instruction->operands[0].ival); break;
-	case APOP: pop_activation_record(); break;
+	case APOP: execute_apop(); break;
 	case ADEF: execute_adef(instruction->operands[0].ival); break;
 	case SDEF: execute_sdef(instruction->operands[0].ival); break;
 	case LOCI: execute_loci(instruction->operands[0].ival); break;
@@ -600,7 +602,7 @@ void execute(Acode *instruction)
 	case LODA: execute_loda(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case IXAD: execute_ixad(instruction->operands[0].ival); break;
 	case AIND: execute_aind(instruction->operands[0].ival); break;
-	//case SIND: execute_sind(); break;
+	case SIND: execute_sind(instruction->operands[0].ival); break;
 	case STOR: execute_store(instruction->operands[0].ival, instruction->operands[1].ival); break;
 	case IGRT: execute_igrt(); break;
 	case IGEQ: execute_igeq(); break;
@@ -1038,7 +1040,12 @@ void execute_aind(int sizeof_elem){
 }
 
 void execute_sind(int sizeof_elem){
-	//TODO ask Bettinelli form of generated Code
+	int start_addr = pop_int();
+	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
+	int start = ip;
+	execute_sdef(sizeof_elem);
+	write_n_istack(bytes, sizeof_elem, start);
+	free(bytes);
 }
 
 void execute_isto(){
@@ -1046,12 +1053,17 @@ void execute_isto(){
 	*obj=*top_ostack();
 	pop_ostack();
 	int addr = pop_int();
-	printf("OBJECT SIZE: %d\n", obj->instance.ival);
+	unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
+	//printf("OBJECT SIZE: %d\n", obj->instance.ival);
 	if(obj->type==ATOM){
-		unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
 		memcpy(bytes, &(obj->instance), obj->size);
 		write_n_istack(bytes, obj->size, addr);
+	}else{
+		bytes = pop_n_istack(obj->size);
+		write_n_istack(bytes, obj->size,addr);
 	}
+	free(obj);
+	free(bytes);
 }
 
 /**
@@ -1123,9 +1135,24 @@ void execute_nequ()
 	push_bool(memcmp(&obj1->instance, &obj2->instance, s1)!=0);
 }
 
+void execute_apop(){
+	print_ostack();
+	print_istack();
+	while(*top_astack()->head != top_ostack()){
+		if(top_ostack()->type == VECTOR)
+			ip = top_ostack()->instance.ival;
+		pop_ostack();
+	}
+	if(top_ostack()->type == VECTOR)
+		ip = top_ostack()->instance.ival;
+	pop_ostack();
+	pop_activation_record();
+}
+
 void print_ostack(){
 	int i;
-	printf("# objects on ostack: %d\n", op);
+	if(op!=0)
+		printf("# objects on ostack: %d\n", op);
 	printf("---------------------------------------\n");
 	for(i=0; i<op; i++){
 		printf("size of object: %d\n", ostack[i]->size);
