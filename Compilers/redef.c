@@ -699,8 +699,11 @@ void execute_loda(int chain, int oid){
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
-	// Metto sull'Instance Stack il contenuto del campo ival di quell'oggetto
-	push_int(p_obj->instance.ival);
+	push_ostack();
+	memcpy(top_ostack(),p_obj,sizeof(Orecord));
+	if(p_obj->type==ATOM)
+		top_ostack()->instance.sval = p_obj;
+	top_ostack()->type = p_obj->type;
 }
 
 /**
@@ -1024,6 +1027,7 @@ void execute_ixad(int sizeof_elem){
 	int dest_addr = start_addr + sizeof_elem*position; // Calcola la posizione dell'elemento da caricare
 	//TODO check outofbound
 	push_int(dest_addr);   // Aggiunge la posizione calcolata nell'Instance Stack
+	top_ostack()->type=VECTOR;
 }
 
 /**
@@ -1049,19 +1053,27 @@ void execute_sind(int sizeof_elem){
 }
 
 void execute_isto(){
+	print_ostack();
+	print_istack();
 	Orecord *obj = malloc(sizeof(Orecord));
 	*obj=*top_ostack();
 	pop_ostack();
-	int addr = pop_int();
+	Orecord* addr_descr = top_ostack();
 	unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
-	//printf("OBJECT SIZE: %d\n", obj->instance.ival);
-	if(obj->type==ATOM){
-		memcpy(bytes, &(obj->instance), obj->size);
-		write_n_istack(bytes, obj->size, addr);
-	}else{
-		bytes = pop_n_istack(obj->size);
-		write_n_istack(bytes, obj->size,addr);
+	if(addr_descr->type==ATOM){
+		Orecord *dest = addr_descr->instance.sval;
+		memcpy(&(dest->instance), &(obj->instance), obj->size);
 	}
+	else{
+		if(obj->type==ATOM){
+			memcpy(bytes, &(obj->instance), obj->size);
+			write_n_istack(bytes, obj->size, addr_descr->instance.ival);
+		}else{
+			bytes = pop_n_istack(obj->size);
+			write_n_istack(bytes, obj->size,addr_descr->instance.ival);
+		}
+	}
+	pop_ostack();
 	free(obj);
 	free(bytes);
 }
@@ -1155,6 +1167,7 @@ void print_ostack(){
 		printf("# objects on ostack: %d\n", op);
 	printf("---------------------------------------\n");
 	for(i=0; i<op; i++){
+		printf("type of object: %s\n", (ostack[i]->type==0? "ATOM" : "VECTOR"));
 		printf("size of object: %d\n", ostack[i]->size);
 		printf("value of object: %d\n", ostack[i]->instance.ival);
 		printf("---------------------------------------\n");
