@@ -67,10 +67,10 @@ void print_astack();
 void print_istack();
 int endian();
 void abstract_machine_Error(char *);
-void stampa(FILE*, Type, Aformat, int);
+void print_array(char, int*, int, int);
 void abstract_machine_Error(char *);
 void read_from_stream(FILE*, Orecord*, Type);
-Aformat parse_format(char* format);
+int bytes_to_int(unsigned char*);
 
 #define ENDIANESS endian()  // Costante per tenere traccia dell'Endianess della macchina
 
@@ -1092,7 +1092,7 @@ void execute_isto(){
  * @param format --> Stringa che specifica il formato secondo cui deve essere letto l'input
  */
 void execute_read(int chain, int oid, char* format) {
-	Type type;
+	Type type = 0;
 	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
 		// Lettura di un intero
 		type = T_INT;
@@ -1102,8 +1102,17 @@ void execute_read(int chain, int oid, char* format) {
 		type = T_STRING;
 	}
 	else { // Lettura di un array
-		Aformat p_format = parse_format(format);
-		type = p_format.type;
+		char* tk_str = strtok(format, ",");
+		Type type;
+		while(tk_str != NULL){
+			if(tk_str[0]!='['){
+				if(tk_str[0]==INTFORMAT_C)
+					type=T_ARR_INT;
+				else
+					type=T_ARR_STR;
+			}
+			tk_str = strtok(NULL, ",");
+		}
 	}
 
 	Arecord* target_ar = top_astack();
@@ -1124,22 +1133,34 @@ void execute_read(int chain, int oid, char* format) {
  */
 void execute_writ(char* format) {
 
-	// Faccio il parsing della stringa contenente il formato
-	Aformat formatted = parse_format(format);
-
 	// A seconda del formato dell'oggetto da stampare, viene chiamata la funzione printf con lo specificatore di formato appropriato
 	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
 		// Stampo un intero
-		stampa(stdout, T_INT, formatted, 0);
+		printf("%d", pop_int());
 	}
 	else if(strcmp(format, STRFORMAT)==0){
 		// Stampo una stringa
-		stampa(stdout, T_STRING, formatted, 0);
+		printf("%s", pop_string());
 	}
 	else {
-		// Stampa di un array
-		stampa(stdout, formatted.type, formatted, 1);
-    }
+		char* tk_str = strtok(format, ",");
+		int *dims=malloc(sizeof(int)), array_level = 0, tot_elem = 0;
+		char type = 'e';
+		while(tk_str != NULL){
+			if(tk_str[0]!='[')
+				type = tk_str[0];
+			else{
+				if(array_level==0)
+					tot_elem+=atoi(tk_str+1);
+				else
+					tot_elem*=atoi(tk_str+1);
+				dims = realloc(dims,(++array_level)*sizeof(int));
+				dims[array_level-1] = atoi(tk_str+1);
+			}
+			tk_str = strtok(NULL, ",");
+		}
+		print_array(type,dims,tot_elem, array_level);
+	}
 }
 
 /**
@@ -1232,172 +1253,99 @@ void read_from_stream(FILE* stream, Orecord* obj_to_load, Type type) {
 	char * str = malloc(PTRSIZE);
 	int elems_to_read, letto, i=0, posizione;
 	switch(type) {
-		case T_INT:
-			fscanf(stdin, "%d", &(obj_to_load->instance.ival));
-			break;
-		case T_STRING:
+	case T_INT:
+		fscanf(stdin, "%d", &(obj_to_load->instance.ival));
+		break;
+	case T_STRING:
+		fscanf(stdin, "%s", str);
+		obj_to_load->instance.sval = insertFind(hash(str), str);
+		break;
+	case T_ARR_INT:
+		// Numero elementi da leggere
+		elems_to_read = (obj_to_load->size)/INTSIZE;
+		posizione = obj_to_load->instance.ival;
+		for(; i<elems_to_read; i++) {
+			fscanf(stdin, "%d", &letto);
+			write_n_istack((unsigned char *)&letto, INTSIZE, posizione);
+			posizione += INTSIZE;
+		}
+		break;
+	case T_ARR_STR:
+		// Numero elementi da leggere
+		elems_to_read = (obj_to_load->size)/PTRSIZE;
+		int posizione = obj_to_load->instance.ival;
+		for(; i<elems_to_read; i++) {
 			fscanf(stdin, "%s", str);
-			obj_to_load->instance.sval = insertFind(hash(str), str);
-			break;
-		case T_ARR_INT:
-			// Numero elementi da leggere
-			elems_to_read = (obj_to_load->size)/INTSIZE;
-			posizione = obj_to_load->instance.ival;
-			for(; i<elems_to_read; i++) {
-				fscanf(stdin, "%d", &letto);
-				write_n_istack((unsigned char *)&letto, INTSIZE, posizione);
-				posizione += INTSIZE;
-			}
-			break;
-		case T_ARR_STR:
-			// Numero elementi da leggere
-			elems_to_read = (obj_to_load->size)/PTRSIZE;
-			int posizione = obj_to_load->instance.ival;
-			for(; i<elems_to_read; i++) {
-				fscanf(stdin, "%s", str);
-				write_n_istack(str, PTRSIZE, posizione);
-				posizione += PTRSIZE;
-			}
-			break;
-		default:
-			break;
-	}
-}
-
-void stampa(FILE* stream, Type type, Aformat f_format, int is_array) {
-	if(is_array == 0) {
-		if(type == T_INT)
-			fprintf(stdout,"%d\n",pop_int());
-		else if (type == T_STRING)
-			fprintf(stdout,"%s\n",pop_string());
-	}
-	else {
-		// Recupero il numero necessario di elementi dall'Instance stack e li metto in un array
-		if(type==T_ARR_INT) { // Recupero interi dall'Instance Stack
-
-			int i=0,tot_elems=f_format.num_elems;
-
-			int array_elems[tot_elems];
-			Value *value = malloc(sizeof(Value));
-			unsigned char *bytes = malloc(sizeof(unsigned char)*INTSIZE);
-			for(i=0; i<tot_elems; i++) {
-				bytes = pop_n_istack(INTSIZE);
-				value->ival = bytes_to_int(bytes);
-				array_elems[i] = value->ival;
-			}
-
-			// TODO Trovare un modo migliore di stampare array in base alle dimensioni innestate
-			Vector dims = f_format.dims; // Array dinamico contenente le dimensioni (ciascuna dimensione e' recuperabile con il metodo vecto_get)
-
-			for(i=tot_elems-1; i>=0; i--) {
-				fprintf(stdout, " %d ", array_elems[i]);
-				if(i==0)
-					fprintf(stdout, "\n");
-			}
+			write_n_istack(str, PTRSIZE, posizione);
+			posizione += PTRSIZE;
 		}
-		else if(type==T_ARR_STR){ // Recupero stringhe dall'Instance Stack
-			int i=0,tot_elems=f_format.num_elems;
-			char *array_elems[tot_elems];
-			Value *value = malloc(sizeof(Value));
-			unsigned char *bytes = malloc(sizeof(unsigned char)*PTRSIZE);
-			for(i=0; i<tot_elems; i++) {
-				bytes = pop_n_istack(PTRSIZE);
-				value->sval = bytes;
-				array_elems[i] = insertFind(hash(bytes), bytes);
-			}
-
-			// TODO Trovare un modo migliore di stampare array in base alle dimensioni innestate
-			Vector dims = f_format.dims; // Array dinamico contenente le dimensioni (ciascuna dimensione e' recuperabile con il metodo vecto_get)
-			for(i=tot_elems-1; i>=0; i--) {
-				fprintf(stdout, " %s ", array_elems[i]);
-				if(i==0)
-					fprintf(stdout, "\n");
-			}
-		}
+		break;
+	default:
+		break;
 	}
 }
 
-Aformat parse_format(char* format) {
-	int num_elems=0;  //num_elems --> Numero totale elementi
-	// Dichiaro ed inizializzo il Vector contenente le singole dimensioni
-	Vector dims;
-	vector_init(&dims);
-	char *token;
-	Type type;
-	// Prendo cio' che mi interessa del primo token (cioe' dimensione piu' esterna)
-	token = strtok(format,ARRAYDELIMITER);
-	char dim [strlen(token)-1];
-	strncpy(dim, token+1 , strlen(token)-1);
-	num_elems+=atoi(dim);
-	vector_append(&dims, atoi(dim));
-	// Processo i successivi token finche' non arrivo al livello piu' interno dove si specifica il tipo degli elementi
-	while(token != NULL)
-	{
-		token = strtok(NULL, ARRAYDELIMITER);
-		if(token!=NULL) {
-			if(token[0]==INTFORMAT_C || token[0]==BOOLFORMAT_C) {
-				type = T_ARR_INT;
-			}
-			else if(token[0]==STRFORMAT_C) {
-				type = T_ARR_STR;
-			}
-			else {
-				char dim [strlen(token)-1];
-				strncpy(dim, token+1 , strlen(token)-1);
-				num_elems+=atoi(dim);
-				vector_append(&dims, atoi(dim));
-			}
-		}
+void print_array(char type, int* dims, int tot_elem, int array_levels) {
+	int i=0, q=0, p_to_print, offset[array_levels-1];
+	offset[array_levels-2] = dims[array_levels-1];
+	for(q=array_levels-3; q>=0;q--){
+		offset[q]=offset[q+1]*dims[q+1];
 	}
-	Aformat f_format = {type, num_elems, dims};
-	return f_format;
-}
 
-void vector_init(Vector *vector) {
-  // initialize size and capacity
-  vector->size = 0;
-  vector->capacity = VECTOR_INITIAL_CAPACITY;
-
-  // allocate memory for vector->data
-  vector->data = malloc(sizeof(int) * vector->capacity);
-}
-
-void vector_append(Vector *vector, int value) {
-  // make sure there's room to expand into
-  vector_double_capacity_if_full(vector);
-
-  // append the value and increment vector->size
-  vector->data[vector->size++] = value;
-}
-
-int vector_get(Vector *vector, int index) {
-  if (index >= vector->size || index < 0) {
-    printf("Index %d out of bounds for vector of size %d\n", index, vector->size);
-    exit(1);
-  }
-  return vector->data[index];
-}
-
-void vector_set(Vector *vector, int index, int value) {
-  // zero fill the vector up to the desired index
-  while (index >= vector->size) {
-    vector_append(vector, 0);
-  }
-
-  // set the value at the desired index
-  vector->data[index] = value;
-}
-
-void vector_double_capacity_if_full(Vector *vector) {
-  if (vector->size >= vector->capacity) {
-    // double vector->capacity and resize the allocated memory accordingly
-    vector->capacity *= 2;
-    vector->data = realloc(vector->data, sizeof(int) * vector->capacity);
-  }
-}
-
-void vector_free(Vector *vector) {
-  free(vector->data);
+	if(type==INTFORMAT_C){
+		int val[tot_elem];
+		for (; i < tot_elem; i++) {
+			val[tot_elem-i-1] = bytes_to_int(pop_n_istack(INTSIZE));
+		}
+		printf("[");
+		for(i = 0; i < tot_elem; i++){
+			p_to_print = 0;
+			for(q = 0; q<array_levels-1; q++){
+				if(i%offset[q]==0)
+					p_to_print++;
+			}
+			if(i!=0){
+				for(q = 0; q < p_to_print; q++){
+					printf("%s","]");
+				}
+				printf("%s",",");
+			}
+			for(q = 0; q < p_to_print; q++){
+				printf("%s","[");
+			}
+			printf("%d ", val[i]);
+		}
+		for(q=0;q<array_levels;q++)
+			printf("]");
+		printf("\n");
+	}else if(type==STRFORMAT_C){
+		char* val[tot_elem];
+		for (; i < tot_elem; i++) {
+			memcpy(&val[tot_elem-i-1], pop_n_istack(PTRSIZE), PTRSIZE);
+		}
+		printf("[");
+		for(i = 0; i < tot_elem; i++){
+					p_to_print = 0;
+					for(q = 0; q<array_levels-1; q++){
+						if(i%offset[q]==0)
+							p_to_print++;
+					}
+					if(i!=0){
+						for(q = 0; q < p_to_print; q++){
+							printf("%s","]");
+						}
+						printf("%s",",");
+					}
+					for(q = 0; q < p_to_print; q++){
+						printf("%s","[");
+					}
+					printf("%s ", val[i]);
+				}
+				for(q=0;q<array_levels;q++)
+					printf("]");
+				printf("\n");
+	}
+	pop_ostack();
 }
 
 int bytes_to_int(unsigned char* bytes) {
