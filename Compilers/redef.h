@@ -9,12 +9,20 @@
 #define REDEF_H_
 
 #define NUMOPERANDS 3
+#define VECTOR_INITIAL_CAPACITY 100
 // Costanti a cui viene assegnata la dimensione di un intero e di un puntatore, relativamente alla macchina in uso
 #define INTSIZE sizeof(int)
 #define PTRSIZE sizeof(void *)
+// Costanti riguardanti le modalita' in cui viene specificato il formato (ad es. per l'operando della funzione WRITE)
 #define INTFORMAT "i"
 #define STRFORMAT "s"
 #define BOOLFORMAT "b"
+#define ARRAYFORMAT "a"
+#define INTFORMAT_C 'i'
+#define STRFORMAT_C 's'
+#define BOOLFORMAT_C 'b'
+
+#define ARRAYDELIMITER ","
 
 // Enum contenente tutti i possibili operatori
 typedef enum {
@@ -74,6 +82,30 @@ typedef struct _acode{
 	Operator operator;            // Contiene il codice corrispondente all'operazione da eseguire (LOCI, LOCS, ADEF, etc...)
 	Value operands[NUMOPERANDS];  // Contiene gli operandi (da un minimo di 0 ad un massimo 3) che servono per eseguire l'istruzione.
 } Acode;
+
+// Struttura che consente di definire un Vector (array dinamico)
+typedef struct {
+  int size;      				// numero di slot usati (numero di elementi nell'array)
+  int capacity;  			    // numero totale di slot disponibili
+  int *data;     				// puntatore all'array di interi
+  char* str_data;               // puntatore all'array di stringhe
+} Vector;
+
+typedef enum {
+	T_INT,
+	T_STRING,
+	T_ARR_INT,
+	T_ARR_STR,
+} Type;
+
+/**
+ * Struttura che rappresenta il formato di un array (risultato del parsing sulla stringa che ne specifica il formato)
+ */
+typedef struct _aformat{
+	Type type;            		  // Tipo dell'oggetto
+	int num_elems;    			  // Numero complessivo di elementi
+	Vector dims;                  // Vector contenente le singole dimensioni
+} Aformat;
 
 typedef enum {ATOM, VECTOR} Otype; // Il tipo (atomico o strutturato), da inserire nell'apposito campo di un Obect Record
 
