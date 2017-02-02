@@ -120,7 +120,7 @@ char* s_op_code[] = {
 
 // Costanti che indicano per quanti elementi bisogna allocare memoria, rispettivamente, per Astack, Ostack e Istack
 const int ASEGMENT = 128;
-const int OSEGMENT = 512;
+const int OSEGMENT = 1024;
 const int ISEGMENT = 128;
 
 const int LINEDIM = 128;
@@ -238,8 +238,8 @@ void start_abstract_machine()
  */
 void stop_abstract_machine()
 {
-	print_ostack();
-	print_istack();
+	//print_ostack();
+	//print_istack();
 
 	// Viene liberata la memoria allocata
 	freemem((char*) program, sizeof(Acode) * code_size);
@@ -681,8 +681,16 @@ void execute_load(int chain, int oid){
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 	// Definisco l'oggetto nell'Object Stack, specificandone la dimensione
-	execute_adef(p_obj->size);
-	memcpy(&(top_ostack()->instance), &(p_obj->instance), p_obj->size);
+	if(p_obj->type==ATOM){
+		execute_adef(p_obj->size);
+		//printf("Pointer LOAD0: %p\n", p_obj->instance.sval);
+		memcpy(&(top_ostack()->instance), &(p_obj->instance), sizeof(Value));
+		//printf("Pointer LOAD1: %p\n", top_ostack()->instance.sval);
+	}else{
+		execute_sdef(p_obj->size);
+		unsigned char *bytes = load_n_istack(p_obj->size, p_obj->instance.ival);
+		write_n_istack(bytes,p_obj->size,p_obj->instance.ival);
+	}
 }
 
 /**
@@ -704,8 +712,10 @@ void execute_loda(int chain, int oid){
 	Orecord* p_obj = *(target_ar->head + oid);
 	push_ostack();
 	memcpy(top_ostack(),p_obj,sizeof(Orecord));
-	if(p_obj->type==ATOM)
+	if(p_obj->type==ATOM){
 		top_ostack()->instance.sval = p_obj;
+		//printf("Pointer LODA: %p\n", top_ostack()->instance.sval);
+	}
 	top_ostack()->type = p_obj->type;
 }
 
@@ -717,6 +727,7 @@ void execute_loda(int chain, int oid){
  * @param chain --> Distanza tra l'ambiente del chiamante e l'ambiente in cui la funzione e' definita
  */
 void execute_push(int num_formals_aux, int num_loc, int chain){
+	//printf("PUSH\n");
 	// Chiamo la funzione per allocare un nuovo Activation Record e aggiungerlo all'Activation Stack
 	Arecord *ar = push_activation_record();
 	//
@@ -867,7 +878,7 @@ void execute_igrt()
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
-	print_istack();
+	//print_istack();
 }
 
 /**
@@ -1056,8 +1067,8 @@ void execute_sind(int sizeof_elem){
 }
 
 void execute_isto(){
-	print_ostack();
-	print_istack();
+	//print_ostack();
+	//print_istack();
 	Orecord *obj = malloc(sizeof(Orecord));
 	*obj=*top_ostack();
 	pop_ostack();
@@ -1093,6 +1104,8 @@ void execute_isto(){
  */
 void execute_read(int chain, int oid, char* format) {
 	Type type = 0;
+	char* format_cpy = malloc(strlen(format)+1);
+	strcpy(format_cpy, format);
 	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
 		// Lettura di un intero
 		type = T_INT;
@@ -1102,7 +1115,7 @@ void execute_read(int chain, int oid, char* format) {
 		type = T_STRING;
 	}
 	else { // Lettura di un array
-		char* tk_str = strtok(format, ",");
+		char* tk_str = strtok(format_cpy, ",");
 		Type type;
 		while(tk_str != NULL){
 			if(tk_str[0]!='['){
@@ -1132,18 +1145,23 @@ void execute_read(int chain, int oid, char* format) {
  * @param format --> Stringa che specifica il formato dell'oggetto da stampare
  */
 void execute_writ(char* format) {
-
+	char* format_cpy = malloc(strlen(format)+1);
+	strcpy(format_cpy, format);
 	// A seconda del formato dell'oggetto da stampare, viene chiamata la funzione printf con lo specificatore di formato appropriato
-	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
+	if((strcmp(format,INTFORMAT)==0)) {
 		// Stampo un intero
-		printf("%d", pop_int());
+		printf("%d\n", pop_int());
+	}
+	else if((strcmp(format,BOOLFORMAT)==0)) {
+		// Stampo un intero
+		printf("%s\n", pop_int()==0?"FALSE":"TRUE");
 	}
 	else if(strcmp(format, STRFORMAT)==0){
 		// Stampo una stringa
-		printf("%s", pop_string());
+		printf("%s\n", pop_string());
 	}
 	else {
-		char* tk_str = strtok(format, ",");
+		char* tk_str = strtok(format_cpy, ",");
 		int *dims=malloc(sizeof(int)), array_level = 0, tot_elem = 0;
 		char type = 'e';
 		while(tk_str != NULL){
@@ -1194,17 +1212,24 @@ void execute_nequ()
 }
 
 void execute_apop(){
-	print_ostack();
-	print_istack();
-	while(*top_astack()->head != top_ostack()){
-		if(top_ostack()->type == VECTOR)
-			ip = top_ostack()->instance.ival;
-		pop_ostack();
+	//print_ostack();
+	//print_istack();
+	int i=0;
+	Orecord **start = top_astack()->head;
+	Orecord ** position = start;
+	for(;i<top_astack()->objects; i++){
+		freemem(*position, sizeof(Orecord));
+		position++;
 	}
-	if(top_ostack()->type == VECTOR)
-		ip = top_ostack()->instance.ival;
-	pop_ostack();
+	while(position!=&ostack[op]){
+		*start = *position;
+		start++;
+		position++;
+	}
+	op-=top_astack()->objects;
 	pop_activation_record();
+	//print_ostack();
+	//print_istack();
 }
 
 void print_ostack(){
@@ -1325,25 +1350,25 @@ void print_array(char type, int* dims, int tot_elem, int array_levels) {
 		}
 		printf("[");
 		for(i = 0; i < tot_elem; i++){
-					p_to_print = 0;
-					for(q = 0; q<array_levels-1; q++){
-						if(i%offset[q]==0)
-							p_to_print++;
-					}
-					if(i!=0){
-						for(q = 0; q < p_to_print; q++){
-							printf("%s","]");
-						}
-						printf("%s",",");
-					}
-					for(q = 0; q < p_to_print; q++){
-						printf("%s","[");
-					}
-					printf("%s ", val[i]);
+			p_to_print = 0;
+			for(q = 0; q<array_levels-1; q++){
+				if(i%offset[q]==0)
+					p_to_print++;
+			}
+			if(i!=0){
+				for(q = 0; q < p_to_print; q++){
+					printf("%s","]");
 				}
-				for(q=0;q<array_levels;q++)
-					printf("]");
-				printf("\n");
+				printf("%s",",");
+			}
+			for(q = 0; q < p_to_print; q++){
+				printf("%s","[");
+			}
+			printf("%s ", val[i]);
+		}
+		for(q=0;q<array_levels;q++)
+			printf("]");
+		printf("\n");
 	}
 	pop_ostack();
 }
