@@ -21,6 +21,8 @@
 #define STRFORMAT_C 's'
 #define BOOLFORMAT_C 'b'
 
+#define ADDR -1
+
 // Enum contenente tutti i possibili operatori
 typedef enum {
     ACODE,
@@ -113,5 +115,6 @@ typedef struct _arecord {
 void start_abstract_machine();
 void stop_abstract_machine();
 void execute(Acode *);
+void abstract_machine_Error(char *);
 
 #endif /* REDEF_H_ */

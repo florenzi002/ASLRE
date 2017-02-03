@@ -66,10 +66,9 @@ void print_ostack();
 void print_astack();
 void print_istack();
 int endian();
-void abstract_machine_Error(char *);
 void print_array(char, int*, int, int);
 void abstract_machine_Error(char *);
-void read_from_stream(FILE*, Orecord*, Type);
+void read_from_stream(Orecord*, Type);
 int bytes_to_int(unsigned char*);
 
 #define ENDIANESS endian()  // Costante per tenere traccia dell'Endianess della macchina
@@ -125,6 +124,7 @@ const int ISEGMENT = 128;
 
 const int LINEDIM = 128;
 
+char *program_file;
 Acode *program;
 int pc;
 Arecord **astack;        // Activation Record
@@ -142,9 +142,8 @@ long allocated = 0, deallocated = 0; // Variabili che tengono traccia della memo
  * un array
  */
 void load_acode(){
-
 	// Apertura in lettura del file con l'Acode
-	FILE *file = fopen("./my_program.txt", "r");
+	FILE *file = fopen(program_file, "r");
 	char str[LINEDIM];
 	// Controllo se il puntatore a file e' nullo
 	if(file != NULL){
@@ -158,7 +157,7 @@ void load_acode(){
 		// Recupero size dalla prima riga
 		code_size = atoi(last+1);
 		// Alloco la memoria necessaria a 'program', che e' un array di Acode, dove l'Acode e' la singola riga del file
-		program = malloc(code_size*sizeof(Acode));
+		program = newmem(code_size*sizeof(Acode));
 		char* line;
 		int p = 0;
 		// Leggo il file riga per riga finche' non arrivo all'EOF
@@ -194,7 +193,10 @@ void load_acode(){
 								if(c!='"'){
 									string[pos++]=c;
 								}
+								char tmp = c;
 								c=*(line+(++counter));
+								if(c=='\0' && tmp!='"')
+									c= ' ';
 							}
 							string[pos]='\0';
 							// Assegno il sval del j-esimo operando della riga di Acode.
@@ -211,6 +213,8 @@ void load_acode(){
 				}
 			}
 		}
+	}else{
+		abstract_machine_Error("Error opening Acode file");
 	}
 	fclose(file);  // Chiusura del file
 }
@@ -238,9 +242,6 @@ void start_abstract_machine()
  */
 void stop_abstract_machine()
 {
-	//print_ostack();
-	//print_istack();
-
 	// Viene liberata la memoria allocata
 	freemem((char*) program, sizeof(Acode) * code_size);
 	freemem((char*) astack, sizeof(Arecord*) * asize);
@@ -371,10 +372,10 @@ char *push_istack(){
 	if(ip == isize) // Verifico se l'Instance Stack e' pieno
 	{
 		full_istack = istack;
-		istack = (char*) newmem(sizeof(char*) * (isize + ISEGMENT));
+		istack = (char*) newmem(sizeof(char) * (isize + ISEGMENT));
 		for(i = 0; i < isize; i++)
 			istack[i] = full_istack[i];
-		freemem((char*) full_istack, sizeof(char*) * isize);
+		freemem((char*) full_istack, sizeof(char) * isize);
 		isize += ISEGMENT;
 	}
 	// Ritorno l'indirizzo all'ultimo elemento
@@ -634,6 +635,7 @@ void execute(Acode *instruction)
 	case RETN: execute_retn(); break;
 	default: abstract_machine_Error("Unknown operator"); break;
 	}
+	//print_ostack();
 }
 
 /**
@@ -681,15 +683,18 @@ void execute_load(int chain, int oid){
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 	// Definisco l'oggetto nell'Object Stack, specificandone la dimensione
-	if(p_obj->type==ATOM){
-		execute_adef(p_obj->size);
-		//printf("Pointer LOAD0: %p\n", p_obj->instance.sval);
-		memcpy(&(top_ostack()->instance), &(p_obj->instance), sizeof(Value));
-		//printf("Pointer LOAD1: %p\n", top_ostack()->instance.sval);
+	if(p_obj->size == ADDR){
+		push_ostack();
+		memcpy(top_ostack(),p_obj,sizeof(Orecord));
 	}else{
-		execute_sdef(p_obj->size);
-		unsigned char *bytes = load_n_istack(p_obj->size, p_obj->instance.ival);
-		write_n_istack(bytes,p_obj->size,p_obj->instance.ival);
+		if(p_obj->type==ATOM){
+			execute_adef(p_obj->size);
+			memcpy(&(top_ostack()->instance), &(p_obj->instance), sizeof(Value));
+		}else{
+			execute_sdef(p_obj->size);
+			unsigned char *bytes = load_n_istack(p_obj->size, p_obj->instance.ival);
+			write_n_istack(bytes,p_obj->size,top_ostack()->instance.ival);
+		}
 	}
 }
 
@@ -713,10 +718,9 @@ void execute_loda(int chain, int oid){
 	push_ostack();
 	memcpy(top_ostack(),p_obj,sizeof(Orecord));
 	if(p_obj->type==ATOM){
-		top_ostack()->instance.sval = p_obj;
-		//printf("Pointer LODA: %p\n", top_ostack()->instance.sval);
+		top_ostack()->instance.sval = (char*)p_obj;
 	}
-	top_ostack()->type = p_obj->type;
+	top_ostack()->size = ADDR;
 }
 
 /**
@@ -736,10 +740,10 @@ void execute_push(int num_formals_aux, int num_loc, int chain){
 	ar->objects = num_loc+num_formals_aux;
 	// Il return address viene settato come program-counter+1
 	ar->retad = pc+1;
-	if(chain<0)
+	if(chain <= 0)
 		ar->al=NULL;
-	else if(chain==0)
-		ar->al = astack[ap-2];
+	else if(chain == 0)
+		ar->al = astack[ap - 2];
 	else
 		ar->al = astack[ap-chain-1];
 }
@@ -1067,15 +1071,13 @@ void execute_sind(int sizeof_elem){
 }
 
 void execute_isto(){
-	//print_ostack();
-	//print_istack();
 	Orecord *obj = malloc(sizeof(Orecord));
 	*obj=*top_ostack();
 	pop_ostack();
 	Orecord* addr_descr = top_ostack();
 	unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
 	if(addr_descr->type==ATOM){
-		Orecord *dest = addr_descr->instance.sval;
+		Orecord *dest = (Orecord*)addr_descr->instance.sval;
 		memcpy(&(dest->instance), &(obj->instance), obj->size);
 	}
 	else{
@@ -1103,7 +1105,7 @@ void execute_isto(){
  * @param format --> Stringa che specifica il formato secondo cui deve essere letto l'input
  */
 void execute_read(int chain, int oid, char* format) {
-	Type type = 0;
+	Type type = -999;
 	char* format_cpy = malloc(strlen(format)+1);
 	strcpy(format_cpy, format);
 	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
@@ -1116,7 +1118,6 @@ void execute_read(int chain, int oid, char* format) {
 	}
 	else { // Lettura di un array
 		char* tk_str = strtok(format_cpy, ",");
-		Type type;
 		while(tk_str != NULL){
 			if(tk_str[0]!='['){
 				if(tk_str[0]==INTFORMAT_C)
@@ -1136,7 +1137,7 @@ void execute_read(int chain, int oid, char* format) {
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord * obj_to_load  = *(target_ar->head + oid);
-	read_from_stream(stdin, obj_to_load, type);
+	read_from_stream(obj_to_load, type);
 }
 
 /**
@@ -1218,7 +1219,7 @@ void execute_apop(){
 	Orecord **start = top_astack()->head;
 	Orecord ** position = start;
 	for(;i<top_astack()->objects; i++){
-		freemem(*position, sizeof(Orecord));
+		freemem((char*)*position, sizeof(Orecord));
 		position++;
 	}
 	while(position!=&ostack[op]){
@@ -1236,13 +1237,13 @@ void print_ostack(){
 	int i;
 	if(op!=0)
 		printf("# objects on ostack: %d\n", op);
-	printf("---------------------------------------\n");
-	for(i=0; i<op; i++){
+	//printf("---------------------------------------\n");
+	/*for(i=0; i<op; i++){
 		printf("type of object: %s\n", (ostack[i]->type==0? "ATOM" : "VECTOR"));
 		printf("size of object: %d\n", ostack[i]->size);
 		printf("value of object: %d\n", ostack[i]->instance.ival);
 		printf("---------------------------------------\n");
-	}
+	}*/
 }
 
 void print_astack() {
@@ -1274,15 +1275,19 @@ void abstract_machine_Error(char* Error){
 	exit(1);
 }
 
-void read_from_stream(FILE* stream, Orecord* obj_to_load, Type type) {
+void read_from_stream(Orecord* obj_to_load, Type type) {
 	char * str = malloc(PTRSIZE);
-	int elems_to_read, letto, i=0, posizione;
+	int elems_to_read, letto, i=0, posizione, scanf_return;
 	switch(type) {
 	case T_INT:
-		fscanf(stdin, "%d", &(obj_to_load->instance.ival));
+		scanf_return = fscanf(stdin, "%d", &(obj_to_load->instance.ival));
+		if(scanf_return == 0 || scanf_return == EOF)
+			abstract_machine_Error("Error reading from stdin");
 		break;
 	case T_STRING:
-		fscanf(stdin, "%s", str);
+		scanf_return = fscanf(stdin, "%s", str);
+		if(scanf_return == 0 || scanf_return == EOF)
+			abstract_machine_Error("Error reading from stdin");
 		obj_to_load->instance.sval = insertFind(hash(str), str);
 		break;
 	case T_ARR_INT:
@@ -1290,7 +1295,9 @@ void read_from_stream(FILE* stream, Orecord* obj_to_load, Type type) {
 		elems_to_read = (obj_to_load->size)/INTSIZE;
 		posizione = obj_to_load->instance.ival;
 		for(; i<elems_to_read; i++) {
-			fscanf(stdin, "%d", &letto);
+			scanf_return = fscanf(stdin, "%d", &letto);
+			if(scanf_return == 0 || scanf_return == EOF)
+				abstract_machine_Error("Error reading from stdin");
 			write_n_istack((unsigned char *)&letto, INTSIZE, posizione);
 			posizione += INTSIZE;
 		}
@@ -1300,12 +1307,15 @@ void read_from_stream(FILE* stream, Orecord* obj_to_load, Type type) {
 		elems_to_read = (obj_to_load->size)/PTRSIZE;
 		int posizione = obj_to_load->instance.ival;
 		for(; i<elems_to_read; i++) {
-			fscanf(stdin, "%s", str);
-			write_n_istack(str, PTRSIZE, posizione);
+			scanf_return = fscanf(stdin, "%s", str);
+			if(scanf_return == 0 || scanf_return == EOF)
+				abstract_machine_Error("Error reading from stdin");
+			write_n_istack((unsigned char*)str, PTRSIZE, posizione);
 			posizione += PTRSIZE;
 		}
 		break;
 	default:
+		scanf_return = -999;
 		break;
 	}
 }
