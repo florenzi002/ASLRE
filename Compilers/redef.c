@@ -165,51 +165,53 @@ void load_acode(){
 			// Leggo una riga del file
 			if(fgets(str, sizeof(str), file)==NULL)
 				abstract_machine_Error("Error loading code");
-			int str_len = strlen(str);
-			// Sostituisco l'eventuale newline con il carattere di terminazione della stringa
-			str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
-			// Tokenizzo la stringa usando come separatore lo spazio. In questo modo posso recuperare l'operatore e gli operandi
-			line = strtok(str, " "); // line contiene ora il codice dell'operatore
-			if(line == NULL)
-				abstract_machine_Error("Error loading code");
-			int i;
-			//
-			for(i=0; i<(sizeof(s_op_code)/sizeof(char*)); i++){
-				if(strcmp(line,s_op_code[i])==0) { // line coincide con uno dei codici
-					Acode *instruction = malloc(sizeof(Acode)); // Alloco memoria per una nuova struct Acode
-					instruction->operator = i;  // Assegno il campo operatore della struct con la stringa corrispondente (p.e. LOCI, LOCS, ecc.)
+			if(strlen(str)!=0) {
+				int str_len = strlen(str);
+				// Sostituisco l'eventuale newline con il carattere di terminazione della stringa
+				str[str_len-1] = (str[str_len-1]=='\n')?'\0':str[str_len-1];
+				// Tokenizzo la stringa usando come separatore lo spazio. In questo modo posso recuperare l'operatore e gli operandi
+				line = strtok(str, " "); // line contiene ora il codice dell'operatore
+				if(line == NULL)
+					abstract_machine_Error("Error loading code");
+				int i;
+				//
+				for(i=0; i<(sizeof(s_op_code)/sizeof(char*)); i++){
+					if(strcmp(line,s_op_code[i])==0) { // line coincide con uno dei codici
+						Acode *instruction = malloc(sizeof(Acode)); // Alloco memoria per una nuova struct Acode
+						instruction->operator = i;  // Assegno il campo operatore della struct con la stringa corrispondente (p.e. LOCI, LOCS, ecc.)
 
-					// Procedo a recuperare gli eventuali operatori associati all'Acode
-					int j = 0;
-					line = strtok(NULL, " ");
-					while (line!=NULL) {
-						// Verifico se devo recuperare una stringa (primo operando di LOCS o WRITE, oppure secondo operando della READ
-						if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {      // L'operando è una stringa
-							char *string = (char*)malloc(sizeof(char)*(strlen(line)-1));
-							int counter, pos;
-							counter = pos = 0;
-							char c = *line;
-							while(c!='\0'){
-								if(c!='"'){
-									string[pos++]=c;
-								}
-								char tmp = c;
-								c=*(line+(++counter));
-								if(c=='\0' && tmp!='"')
-									c= ' ';
-							}
-							string[pos]='\0';
-							// Assegno il sval del j-esimo operando della riga di Acode.
-							instruction -> operands[j].sval = insertFind(hash(string), string);
-						}
-						else {  // L'operando è un intero
-							instruction -> operands[j].ival = atoi(line); // Assegno l'ival del j-esimo operando della riga di Acode
-						}
+						// Procedo a recuperare gli eventuali operatori associati all'Acode
+						int j = 0;
 						line = strtok(NULL, " ");
-						j++;
+						while (line!=NULL) {
+							// Verifico se devo recuperare una stringa (primo operando di LOCS o WRITE, oppure secondo operando della READ
+							if(((i==LOCS || i==WRIT) && (j==0)) || (i==READ && j==2)) {      // L'operando è una stringa
+								char *string = (char*)malloc(sizeof(char)*(strlen(line)-1));
+								int counter, pos;
+								counter = pos = 0;
+								char c = *line;
+								while(c!='\0'){
+									if(c!='"'){
+										string[pos++]=c;
+									}
+									char tmp = c;
+									c=*(line+(++counter));
+									if(c=='\0' && tmp!='"')
+										c= ' ';
+								}
+								string[pos]='\0';
+								// Assegno il sval del j-esimo operando della riga di Acode.
+								instruction -> operands[j].sval = insertFind(hash(string), string);
+							}
+							else {  // L'operando è un intero
+								instruction -> operands[j].ival = atoi(line); // Assegno l'ival del j-esimo operando della riga di Acode
+							}
+							line = strtok(NULL, " ");
+							j++;
+						}
+						program[p++] = *instruction; // Aggiungo l'istruzione (una struct Acode) al programma (array di Acode)
+						break;
 					}
-					program[p++] = *instruction; // Aggiungo l'istruzione (una struct Acode) al programma (array di Acode)
-					break;
 				}
 			}
 		}
@@ -287,7 +289,7 @@ void freemem(char *p, int size)
 /**
  * Funzione che esegue il push di un Activation Record, aggiungendolo all'astack
  *
- * @return l'Activation Record creato
+ * @return Puntatore all'Activation Record creato
  */
 Arecord *push_activation_record()
 {
@@ -314,7 +316,7 @@ Arecord *push_activation_record()
  * Funzione che recupera l'Activation Record in cima allo stack (cioe' quello presente nella posizione appena sopra a quella
  * puntata da ap, che indica la prima posizione libera)
  *
- * @return l'Activation Record in cima all'Activation Stack
+ * @return Puntatore all'Activation Record in cima all'Activation Stack
  */
 Arecord *top_astack(){
 	if (ap==0) { // Errore: Astack vuoto
@@ -326,7 +328,7 @@ Arecord *top_astack(){
 /**
  * Funzione che esegue il push di un Object Record, aggiungendolo all'Obect Stack
  *
- * @return l'Object Record appena creato
+ * @return Puntatore all'Object Record appena creato
  */
 Orecord *push_ostack(){
 	Orecord **full_ostack;
@@ -352,7 +354,7 @@ Orecord *push_ostack(){
  * Funzione che recupera l'Object Record in cima allo stack (cioe' quello presente nella posizione appena sopra a quella
  * puntata da op, che indica la prima posizione libera)
  *
- * @return l'Object Record in cima all'Activation Stack
+ * @return Puntatore all'Object Record in cima all'Activation Stack
  */
 Orecord *top_ostack(){
 	if (op==0) { // Errore: Object Stack vuoto
@@ -386,7 +388,7 @@ char *push_istack(){
  * Funzione che recupera la cella dell'Instance Stack che si trova in cima allo stack (cioe' quella presente nella
  * posizione appena sopra a quella puntata da ip, che indica la prima posizione libera)
  *
- * @return l'Object Record in cima all'Activation Stack
+ * @return l'indirizzo della cella in cima all'Activation Stack, cioe' quella sopra all'ip
  */
 char *top_istack(){
 	if (ip==0) { // Errore: Instance Stack vuoto
@@ -406,6 +408,12 @@ int endian(){
 	return 1;      // Big Endian
 }
 
+/**
+ * Funzione che aggiunge un certo numero di bytes all'Instance stack a partire dalla prima posizione libera
+ *
+ * @param bytes --> I bytes da inserire
+ * @param size --> Il numero di bytes da inserire
+ */
 void push_n_istack(unsigned char* bytes, int size) {
 	int p;
 	// A seconda dell'Endianess cambia l'ordine con cui i vari byte vengono memorizzati
@@ -425,12 +433,19 @@ void push_n_istack(unsigned char* bytes, int size) {
 	}
 }
 
+/**
+ * Funzione che aggiunge un certo numero di bytes all'Instance stack a partire da una posizione specificata
+ *
+ * @param bytes --> I bytes da inserire
+ * @param size --> Il numero di bytes da inserire
+ * @param start_p --> La posizione iniziale da cui iniziare a scrivere i bytes
+ */
 void write_n_istack(unsigned char* bytes, int size, int start_p){
 	int p, s=start_p;
 	// A seconda dell'Endianess cambia l'ordine con cui i vari byte vengono memorizzati
 	if (ENDIANESS) { // Big Endian (la memorizzazione inizia dal byte piu' significativo)
 		p = 0;
-		// Memorizzo byte per byte nell'istack
+		// Memorizzo byte per byte nell'istack a partire dalla posizione specificata da s
 		for (; p < size; p++) {
 			istack[s++] = *(bytes+p);
 		}
@@ -537,10 +552,16 @@ unsigned char *pop_n_istack(int n){
 	return i_bytes;
 }
 
+/**
+ * Recupera dall'Instance stack n bytes a partire da una certa posizione start
+ *
+ * @param n --> Numero di celle da recuperare dall'Instance Stack
+ * @param start --> Posizione iniziale da cui recuperare gli elementi
+ */
 unsigned char *load_n_istack(int n, int start){
 	unsigned char *i_bytes = malloc(n*sizeof(char));
 	int p = 0;
-	// Risalgo nell'Instance Stack del numero di posizioni necessario per recuperare la prima
+	// Parto dalla posizione specificata dal parametro start e risalgo nell'Instance Stack del numero di posizioni necessario per recuperare la prima
 	char *q = &istack[start];
 	for(;p<n;p++){
 		// A ciascun byte di i_bytes assegno il valore di ciò che punta q
@@ -559,9 +580,9 @@ unsigned char *load_n_istack(int n, int start){
 }
 
 /**
- * Funzione che recupera un intero a partire dalla cima dell'Instance Stack
+ * Funzione che recupera il valore dell'oggetto in cima all'Object Stack
  *
- * @return --> L'intero recuperato dall'Instance Stack
+ * @return --> L'intero recuperato dal campo ival di instance
  */
 int pop_int(){
 	int res = top_ostack()->instance.ival;
@@ -570,7 +591,7 @@ int pop_int(){
 }
 
 /**
- * Funzione che recupera una stringa dalla cima dell'Instance Stack
+ * Funzione che recupera una stringa dal campo sval dell'oggetto in cima all'Object Stack
  *
  * @return --> Puntatore alla stringa recuperata
  */
@@ -580,6 +601,11 @@ char* pop_string(){
 	return res;
 }
 
+/**
+ * Richiama la funzione pop_int (la macchina virtuale considera un boolano come un intero avente valore 0 o 1)
+ *
+ * @return --> L'intero recuperato dal campo ival dell'oggetto in cima all'Object Stack
+ */
 int pop_bool(){
 	return pop_int();
 }
@@ -591,7 +617,7 @@ int pop_bool(){
  */
 void execute(Acode *instruction)
 {
-	//printf("istr: %d|%d - %s\n", pc+1,instruction->operator, s_op_code[instruction->operator]);
+   	printf("istr: %d|%d - %s\n", pc+1,instruction->operator, s_op_code[instruction->operator]);
 	// A seconda dell'operatore, chiamo la funzione che esegue la corrispondente istruzione
 	switch(instruction->operator)
 	{
@@ -656,6 +682,7 @@ void execute_store(int chain, int oid) {
 	int size = top_ostack()->size;
 
 	if(p_obj->type==ATOM)
+		// Per oggetti atomici, si copia l'indirizzo del campo instance dell'oggetto in cima allo stack nell'indirizzo del campo instance di p_obj
 		memcpy(&(p_obj->instance),&(top_ostack()->instance), size);
 	else{
 		// Recupero dall'istack un numero di bytes specificato dal campo size dell'Orecord
@@ -680,18 +707,22 @@ void execute_load(int chain, int oid){
 	for(; i<chain; i++) {
 		target_ar = target_ar->al;
 	}
-	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
+	// Si ottiene un riferimento all'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid
 	Orecord* p_obj = *(target_ar->head + oid);
-	// Definisco l'oggetto nell'Object Stack, specificandone la dimensione
-	if(p_obj->size == ADDR){
+	if(p_obj->size == ADDR){ // Caricamento di un indirizzo
+		// Creazione nuovo Object Record
 		push_ostack();
+		// Viene copiato p_obj nel puntatore al nuovo oggetto
 		memcpy(top_ostack(),p_obj,sizeof(Orecord));
-	}else{
+	}else{ // Caricamento di un oggetto atomico
 		if(p_obj->type==ATOM){
+			// Viene creato un nuovo oggetto di tipo atomico
 			execute_adef(p_obj->size);
+			// Viene copiato l'indirizzo del campo instance di p_obj nell'indirizzo del campo instance del nuovo oggetto
 			memcpy(&(top_ostack()->instance), &(p_obj->instance), sizeof(Value));
-		}else{
+		}else{ // Caricamento di un oggetto di tipo VECTOR
 			execute_sdef(p_obj->size);
+			// Recupero dall'Instance stack i valori degli elementi atomici di p_obj e li associo al nuovo oggetto.
 			unsigned char *bytes = load_n_istack(p_obj->size, p_obj->instance.ival);
 			write_n_istack(bytes,p_obj->size,top_ostack()->instance.ival);
 		}
@@ -699,7 +730,7 @@ void execute_load(int chain, int oid){
 }
 
 /**
- * Funzione che esegue l'istruzione LODA per caricare l'indirizzo di un'istanza di un array
+ * Funzione che esegue l'istruzione LODA per effettuare il caricamento di un indirizzo
  *
  * @param chain --> Indica la distanza, cioe' di quanti Activation Record dobbiamo risalire per arrivare all'ambiente in
  *                  cui l'array e' definito (se e' 0, allora l'oggetto e' locale)
@@ -716,8 +747,9 @@ void execute_loda(int chain, int oid){
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord* p_obj = *(target_ar->head + oid);
 	push_ostack();
+	// Viene copiato p_obj nel nuovo oggetto creato
 	memcpy(top_ostack(),p_obj,sizeof(Orecord));
-	if(p_obj->type==ATOM){
+	if(p_obj->type==ATOM){ // Per oggetti atomici, copio p_obj nel campo sval
 		top_ostack()->instance.sval = (char*)p_obj;
 	}
 	top_ostack()->size = ADDR;
@@ -736,16 +768,16 @@ void execute_push(int num_formals_aux, int num_loc, int chain){
 		dyn_ar = top_astack();
 	// Chiamo la funzione per allocare un nuovo Activation Record e aggiungerlo all'Activation Stack
 	Arecord *ar = push_activation_record();
+	// In base al valore della catena, viene settato opportunamente l'access link
 	ar->al=dyn_ar;
 	while((chain--)>0)
 		ar->al = ar->al->al;
-	//
+	// Il campo head del nuovo Activation Record punta al primo degli oggetti ad esso associati
 	ar->head = &ostack[op-num_formals_aux];
 	// Il numero di oggetti associati all'Activation Record e' dato dal numero dei locali + il numero dei parametri formali e ausiliari
 	ar->objects = num_loc+num_formals_aux;
 	// Il return address viene settato come program-counter+1
 	ar->retad = pc+1;
-
 }
 
 /**
@@ -760,7 +792,7 @@ void execute_jump(int address){
 /**
  * Funzione che esegue l'istruzione per l'operatore LOCI per le costanti intere
  *
- * @param const_val --> L'intero da mettere nell'Instance stack
+ * @param const_val --> L'intero da mettere nel campo ival del relativo oggetto
  */
 void execute_loci(int const_val){
 	push_int(const_val);
@@ -769,7 +801,7 @@ void execute_loci(int const_val){
 /**
  * Funzione che esegue l'istruzione per l'operatore LOCS per le costanti stringa
  *
- * @param const_val --> Puntatore da aggiungere nell'Instance Stack
+ * @param const_val --> Stringa da aggiungere nel campo sval del relativo oggetto
  */
 void execute_locs(char* const_val){
 	push_string(const_val);
@@ -788,7 +820,7 @@ void execute_umin(){
  */
 void execute_nega() {
 	int m = pop_int();
-	// Se m non e' zero (vero), carico sull'Instance stack il valore 0 (falso), altrimenti carico il valore 1 (vero)
+	// Se m non e' zero (cioe' se l'espressione e' vera), assegno al relativo oggetto il valore 0 (falso), altrimenti assegno il valore 1 (vero)
 	push_bool(m ? 0 : 1);
 }
 
@@ -827,10 +859,11 @@ void execute_retn()
  */
 void execute_addi()
 {
-	// Tolgo i due interi dall'Instance Stack e ci inserisco la somma
+	// Vengono recuperati i due addendi dagli oggetti in cima all'Ostack, che vengono dunque consumati
 	int n, m;
 	n = pop_int();
 	m = pop_int();
+	// Creazione di un nuovo oggetto nell'Object stack, il cui valore e' la somma dei due addendi
 	push_int(m+n);
 }
 
@@ -839,10 +872,11 @@ void execute_addi()
  */
 void execute_subi()
 {
-	// Tolgo i due interi dall'Instance Stack (prima il sottraendo, poi il minuendo) e ci inserisco la differenza
+	// Vengono recuperati il sottraendo e il minuendo dagli oggetti in cima all'Ostack, che vengono dunque consumati
 	int n, m;
 	n = pop_int();
 	m = pop_int();
+	// Creazione di un nuovo oggetto nell'Object stack, il cui valore e' la differenza tra minuendo e sottraendo
 	push_int(m-n);
 }
 
@@ -851,10 +885,11 @@ void execute_subi()
  */
 void execute_muli()
 {
-	// Tolgo i due interi dall'Instance Stack e ci inserisco il prodotto
+	// Vengono recuperati i due fattori dagli oggetti in cima all'Ostack, che vengono dunque consumati
 	int n, m;
 	n = pop_int();
 	m = pop_int();
+	// Creazione di un nuovo oggetto nell'Object stack, il cui valore e' il prodotto dei due
 	push_int(m*n);
 }
 
@@ -863,18 +898,19 @@ void execute_muli()
  */
 void execute_divi()
 {
-	// Tolgo i due interi dall'Instance Stack (prima il divisore e poi il dividendo) e ci inserisco il quoziente
+	// Vengono recuperati prima il divisore e poi il dividendo dagli oggetti in cima all'Ostack, che vengono dunque consumati
 	int n, m;
 	n = pop_int();
 	if(n==0) // Controllo che non venga eseguita una divisione per zero (errore a runtime)
 		abstract_machine_Error("Error: Divide by 0");
 	m = pop_int();
+	// Creazione di un nuovo oggetto nell'Object Stack, il cui valore e' il quoziente
 	push_int(m/n);
 }
 
 /**
- * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' maggiore del secondo.
- * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ * Confronta due interi e stabilisce se il primo e' maggiore del secondo.
+ * In caso affermativo viene assegnato all'oggetto in cima all'Object stack il valore 1 (corrispondente a true), altrimenti il valore 0
  */
 void execute_igrt()
 {
@@ -882,12 +918,11 @@ void execute_igrt()
 	n = pop_int();
 	m = pop_int();
 	push_bool(m>n);
-	//print_istack();
 }
 
 /**
- * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' maggiore o uguale al secondo.
- * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ * Confronta due interi e stabilisce se il primo e' maggiore o uguale al secondo.
+ * In caso affermativo viene assegnato all'oggetto in cima all'Object stack il valore 1 (corrispondente a true), altrimenti il valore 0
  */
 void execute_igeq()
 {
@@ -898,8 +933,8 @@ void execute_igeq()
 }
 
 /**
- * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' minore del secondo.
- * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ * Confronta due interi e stabilisce se il primo e' minore del secondo.
+ * In caso affermativo viene assegnato all'oggetto in cima all'Object stack il valore 1 (corrispondente a true), altrimenti il valore 0
  */
 void execute_ilet()
 {
@@ -910,8 +945,8 @@ void execute_ilet()
 }
 
 /**
- * Confronta due interi recuperati dall'Instance stack e stabilisce se il primo e' minore o uguale al secondo.
- * In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0
+ * Confronta due interi e stabilisce se il primo e' minore o uguale al secondo.
+ * In caso affermativo viene assegnato all'oggetto in cima all'Object stack il valore 1 (corrsipondente a true), altrimenti il valore 0
  */
 void execute_ileq() {
 	int n, m;
@@ -921,8 +956,8 @@ void execute_ileq() {
 }
 
 /**
- * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è maggiore della
- * seconda. In caso affermativo viene inserito nell'Instance stack il valore 1, altrimenti il valore 0.
+ * Confronta due stringhe e stabilisce se la prima è maggiore della
+ * seconda. In caso affermativo viene assegnato all'oggetto in cima all'Object stack il valore 1 (corrsipondente a true), altrimenti il valore 0.
  */
 void execute_sgrt() {
 	const char* s2 = pop_string();
@@ -936,8 +971,8 @@ void execute_sgrt() {
 }
 
 /**
- * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è maggiore o
- * uguale alla seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ * Confronta due stringhe e stabilisce se la prima è maggiore o
+ * uguale alla seconda. In caso affermativo viene assegnato all'oggetto in cima all'Object Stack il valore 1 (corrispondente a true), altrimenti il valore 0.
  */
 void execute_sgeq() {
 	const char* s2 = pop_string();
@@ -951,8 +986,8 @@ void execute_sgeq() {
 }
 
 /**
- * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è minore della
- * seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ * Confronta due stringhe e stabilisce se la prima è minore della
+ * seconda. In caso affermativo viene assegnato all'oggetto in cima all'Object Stack il valore 1 (corrispondente a true), altrimenti il valore 0.
  */
 void execute_slet() {
 	const char* s2 = pop_string();
@@ -966,8 +1001,8 @@ void execute_slet() {
 }
 
 /**
- * Confronta due stringhe ottenute recuperando il puntatore dall'Instance Stack e stabilisce se la prima è minore della
- * seconda. In caso affermativo viene inserito nell'Instance Stack il valore 1, altrimenti il valore 0.
+ * Confronta due stringhe e stabilisce se la prima è minore della
+ * seconda. In caso affermativo viene assegnato all'oggetto in cima all'Object Stack il valore 1 (corrispondente a true), altrimenti il valore 0.
  */
 void execute_sleq() {
 	const char* s2 = pop_string();
@@ -1008,6 +1043,7 @@ void execute_sdef(int size)
 	po->size = size;
 	po->instance.ival=ip;
 	int i = 0;
+	// Viene assegnato nell'Instance Stack lo spazio necessario per contenere gli elementi atomici del vettore
 	for(;i<size;i++)
 		push_istack();
 }
@@ -1020,22 +1056,26 @@ void execute_sdef(int size)
  */
 void execute_pack(int n_elem, int sizeof_elem){
 	int i=0, bytes = n_elem*sizeof_elem;
+	// Vengono recuperati i valori degli oggetti atomici, i quali vengono rimossi dall'Object Stack
 	unsigned char* byte_arr = malloc(bytes);
 	for(;i<n_elem;i++){
 		memcpy((byte_arr+(i*sizeof_elem)),&(top_ostack()->instance), sizeof_elem);
 		pop_ostack();
 	}
+	// I valori degli elementi atomici dell'array vengono inseriti nell'Instance Stack
 	push_n_istack(byte_arr, bytes);
 	free(byte_arr);
+	// Creazione del nuovo oggetto array
 	Orecord *po;
 	po = push_ostack();
 	po->type = VECTOR;
 	po->size = bytes;
+	// Il campo instance del nuovo oggetto array punta alla prima cella dell'Instance stack contenente i valori degli elementi atomici dell'array
 	po->instance.ival=ip-bytes;
 }
 
 /**
- * Funzione che implementa l'operatore IXAD per il caricamento dell'indirizzo di un elemento dell'array
+ * Funzione che implementa l'operatore IXAD per il caricamento dell'indirizzo di un elemento dell'array (indexed address)
  *
  * @param sizeof_elem --> La dimensione dell'elemento
  */
@@ -1043,8 +1083,7 @@ void execute_ixad(int sizeof_elem){
 	int position = pop_int(); // Posizione all'interno dell'array dell'elemento da caricare
 	int start_addr = pop_int(); // Indirizzo di partenza dell'array
 	int dest_addr = start_addr + sizeof_elem*position; // Calcola la posizione dell'elemento da caricare
-	//TODO check outofbound
-	push_int(dest_addr);   // Aggiunge la posizione calcolata nell'Instance Stack
+	push_int(dest_addr);   // Aggiunge la posizione calcolata nello stack
 	top_ostack()->type=VECTOR;
 }
 
@@ -1054,6 +1093,7 @@ void execute_ixad(int sizeof_elem){
  * @param sizeof_elem --> La dimensione dell'elemento
  */
 void execute_aind(int sizeof_elem){
+	// Recupero dall'Instance stack i bytes necessari e li copio nell'indirizzo del campo instance dell'oggetto che rappresenta l'elemento dell'array
 	int start_addr = pop_int();
 	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
 	execute_adef(sizeof_elem);
@@ -1061,7 +1101,13 @@ void execute_aind(int sizeof_elem){
 	free(bytes);
 }
 
+/**
+ * Funzione che implementa l'operatore SIND per effettuare l'indirect load di un oggetto di tipo strutturato
+ *
+ * @param sizeof_elem --> La dimensione dell'elemento
+ */
 void execute_sind(int sizeof_elem){
+	// Recupero dall'Instance stack i bytes necessari
 	int start_addr = pop_int();
 	unsigned char* bytes = load_n_istack(sizeof_elem, start_addr);
 	int start = ip;
@@ -1070,12 +1116,17 @@ void execute_sind(int sizeof_elem){
 	free(bytes);
 }
 
+/**
+ * Funzione che implementa l'operatore ISTO per effettuare l'indirect store
+ */
 void execute_isto(){
+	// Recupero dall'Object Stack gli oggetti contenenti l'indirizzo e il valore da assegnare.
 	Orecord *obj = malloc(sizeof(Orecord));
 	*obj=*top_ostack();
 	pop_ostack();
 	Orecord* addr_descr = top_ostack();
 	unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
+	// Viene effettuato l'assegnamento del valore risultante dalla computazione di un'espressione
 	if(addr_descr->type==ATOM){
 		Orecord *dest = (Orecord*)addr_descr->instance.sval;
 		memcpy(&(dest->instance), &(obj->instance), obj->size);
@@ -1108,18 +1159,17 @@ void execute_read(int chain, int oid, char* format) {
 	Type type = -999;
 	char* format_cpy = malloc(strlen(format)+1);
 	strcpy(format_cpy, format);
-	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) {
-		// Lettura di un intero
+	if((strcmp(format,INTFORMAT)==0) || (strcmp(format,BOOLFORMAT)==0)) { 	// Lettura di un intero o di un booleano
 		type = T_INT;
 	}
-	else if(strcmp(format, STRFORMAT)==0){
-		// Lettura di una stringa
+	else if(strcmp(format, STRFORMAT)==0){ // Lettura di una stringa
 		type = T_STRING;
 	}
 	else { // Lettura di un array
 		char* tk_str = strtok(format_cpy, ",");
 		while(tk_str != NULL){
 			if(tk_str[0]!='['){
+				// Viene tokenizzata la stringa finche' non si arriva al tipo degli elementi atomici
 				if(tk_str[0]==INTFORMAT_C)
 					type=T_ARR_INT;
 				else
@@ -1137,6 +1187,7 @@ void execute_read(int chain, int oid, char* format) {
 	}
 	// Recupero dall'Object Stack l'oggetto relativo all'identificatore assegnato, sfruttando il campo head dell'Activation Record e l'oid dell'oggetto
 	Orecord * obj_to_load  = *(target_ar->head + oid);
+	// Viene effettuata la lettura dallo standard input
 	read_from_stream(obj_to_load, type);
 }
 
@@ -1149,23 +1200,22 @@ void execute_writ(char* format) {
 	char* format_cpy = malloc(strlen(format)+1);
 	strcpy(format_cpy, format);
 	// A seconda del formato dell'oggetto da stampare, viene chiamata la funzione printf con lo specificatore di formato appropriato
-	if((strcmp(format,INTFORMAT)==0)) {
-		// Stampo un intero
+	if((strcmp(format,INTFORMAT)==0)) { // Stampa di un intero
 		printf("%d\n", pop_int());
 	}
-	else if((strcmp(format,BOOLFORMAT)==0)) {
-		// Stampo un intero
+	else if((strcmp(format,BOOLFORMAT)==0)) { // Stampo false o true a seconda del valore che recupero
 		printf("%s\n", pop_int()==0?"FALSE":"TRUE");
 	}
-	else if(strcmp(format, STRFORMAT)==0){
+	else if(strcmp(format, STRFORMAT)==0){ // Stampa di una
 		// Stampo una stringa
 		printf("%s\n", pop_string());
 	}
-	else {
+	else { // Stampa di un array
 		char* tk_str = strtok(format_cpy, ",");
 		int *dims=malloc(sizeof(int)), array_level = 0, tot_elem = 0;
 		char type = 'e';
 		while(tk_str != NULL){
+			// Tokenizzo la stringa del formato per recuperare le singole dimensioni, calcolare il numero degli elementi e il tipo
 			if(tk_str[0]!='[')
 				type = tk_str[0];
 			else{
@@ -1183,8 +1233,8 @@ void execute_writ(char* format) {
 }
 
 /**
- * Confronta due oggetti (operatore ==): se questi sono uguali, carica nell'instance stack il valore 1, altrimenti carica
- * il valore 0
+ * Confronta due oggetti (operatore ==): se questi sono uguali, carica valore 1 (corrispondente a true), altrimenti carica
+ * il valore 0 (corrispondente a false)
  */
 void execute_equa()
 {
@@ -1198,8 +1248,8 @@ void execute_equa()
 }
 
 /**
- * Confronta due oggetti (operatore !=): se questi sono diversi, carica nell'instance stack il valore 1, altrimenti carica
- * il valore 0
+ * Confronta due oggetti (operatore !=): se questi sono diversi, carica nell'instance stack il valore 1 (corrispondente a true), altrimenti
+ * carica il valore 0 (corrispondente a false)
  */
 void execute_nequ()
 {
@@ -1212,45 +1262,50 @@ void execute_nequ()
 	push_bool(memcmp(&obj1->instance, &obj2->instance, s1)!=0);
 }
 
+/**
+ * Funzione che implementa l'operatore APOP, necessario per cancellare l'Activation Record in cima all'astack e tutti gli oggetti
+ * ad esso associati
+ */
 void execute_apop(){
-	//print_ostack();
-	//print_istack();
+	// Vengono eliminati tutti gli oggetti associati all'Activation Record, a partire da quello puntato dal campo
 	int i=0;
 	Orecord **start = top_astack()->head;
 	Orecord ** position = start;
-	//printf("IP0: %d\n", ip);
 	for(;i<top_astack()->objects; i++){
 		if((*position)->size!=ADDR && (*position)->type==VECTOR)
 			ip-=(*position)->size;
-		//printf("%s\t%s\n", (*position)->size==ADDR?"ADDR":"OBJ", (*position)->type==VECTOR?"VECTOR":"ATOMIC");
 		freemem((char*)*position, sizeof(Orecord));
 		position++;
 	}
-	//printf("IP1: %d\n", ip);
+	// Gli eventuali oggetti sottostanti vengono spostati per riempire le posizioni dell'astack rimaste vuote dopo la cancellazione degli oggetti
 	while(position!=&ostack[op]){
 		*start = *position;
 		start++;
 		position++;
 	}
-	op-=top_astack()->objects;
+	op-=top_astack()->objects; // L'Object Pointer viene opportunamente decrementato
 	pop_activation_record();
-	//print_ostack();
-	//print_istack();
 }
 
+/**
+ * Funzione ausiliaria che stampa l'Object Stack
+ */
 void print_ostack(){
 	int i;
 	if(op!=0)
 		printf("# objects on ostack: %d\n", op);
-	//printf("---------------------------------------\n");
-	/*for(i=0; i<op; i++){
+	printf("---------------------------------------\n");
+	for(i=0; i<op; i++){
 		printf("type of object: %s\n", (ostack[i]->type==0? "ATOM" : "VECTOR"));
 		printf("size of object: %d\n", ostack[i]->size);
 		printf("value of object: %d\n", ostack[i]->instance.ival);
 		printf("---------------------------------------\n");
-	}*/
+	}
 }
 
+/**
+ * Funzione ausiliaria che stampa l'Activation Stack
+ */
 void print_astack() {
 	int i;
 	for(i=0; i<ap;i++) {
@@ -1266,6 +1321,9 @@ void print_astack() {
 	}
 }
 
+/**
+ * Funzione ausiliaria che stampa l'Instance Stack
+ */
 void print_istack() {
 	int i=0;
 	for(i=0; i<ip; i++) {
@@ -1280,24 +1338,30 @@ void abstract_machine_Error(char* Error){
 	exit(1);
 }
 
+/**
+ * Funzione che esegue la lettura dallo standard input e assegna all'oggetto passato come primo parametro
+ *
+ * @param obj_to_load --> L'oggetto a cui assegnare cio' che l'utente fornisce in input
+ * @param type --> Il tipo di oggetto da assegnare
+ */
 void read_from_stream(Orecord* obj_to_load, Type type) {
 	char * str = malloc(PTRSIZE);
 	int elems_to_read, letto, i=0, posizione, scanf_return;
 	switch(type) {
-	case T_INT:
+	case T_INT:  // Lettura di un intero dallo standard input. Tale valore viene inserito nel campo ival dell'oggetto
 		scanf_return = fscanf(stdin, "%d", &(obj_to_load->instance.ival));
 		if(scanf_return == 0 || scanf_return == EOF)
 			abstract_machine_Error("Error reading from stdin");
 		break;
-	case T_STRING:
+	case T_STRING: // Lettura di una stringa dallo standard input. Tale valore e' salvato nel campo sval dell'oggetto
 		scanf_return = fscanf(stdin, "%s", str);
 		if(scanf_return == 0 || scanf_return == EOF)
 			abstract_machine_Error("Error reading from stdin");
-		obj_to_load->instance.sval = insertFind(hash(str), str);
+		obj_to_load->instance.sval = insertFind(hash(str), str); // Per le stringhe si usa una hash table per evitare spreco di memoria dovuto a duplicati
 		break;
-	case T_ARR_INT:
-		// Numero elementi da leggere
-		elems_to_read = (obj_to_load->size)/INTSIZE;
+	case T_ARR_INT: // Lettura di un array di interi
+		elems_to_read = (obj_to_load->size)/INTSIZE; // Calcolo del numero elementi da leggere
+		// Ciascun intero letto dallo standard input viene aggiunto all'Instance Stack nella posizione specificata
 		posizione = obj_to_load->instance.ival;
 		for(; i<elems_to_read; i++) {
 			scanf_return = fscanf(stdin, "%d", &letto);
@@ -1307,9 +1371,9 @@ void read_from_stream(Orecord* obj_to_load, Type type) {
 			posizione += INTSIZE;
 		}
 		break;
-	case T_ARR_STR:
-		// Numero elementi da leggere
-		elems_to_read = (obj_to_load->size)/PTRSIZE;
+	case T_ARR_STR: // Lettura di un array di stringhe
+		elems_to_read = (obj_to_load->size)/PTRSIZE; // Calcolo del numero elementi da leggere
+		// Per ciascuna stringa letta dallo standard input viene aggiunto nell'Instance Stack il puntatore
 		int posizione = obj_to_load->instance.ival;
 		for(; i<elems_to_read; i++) {
 			scanf_return = fscanf(stdin, "%s", str);
@@ -1325,6 +1389,13 @@ void read_from_stream(Orecord* obj_to_load, Type type) {
 	}
 }
 
+/**
+ * Funzione che esegue la stampa di un array
+ * @param type --> Il tipo degli elementi atomici
+ * @param dims --> Le singole dimensioni
+ * @param tot_elem --> Numero complessivo di elementi dell'array
+ * @param array_levels --> Numero di livelli
+ */
 void print_array(char type, int* dims, int tot_elem, int array_levels) {
 	int i=0, q=0, p_to_print, offset[array_levels-1];
 	offset[array_levels-2] = dims[array_levels-1];
@@ -1388,6 +1459,11 @@ void print_array(char type, int* dims, int tot_elem, int array_levels) {
 	pop_ostack();
 }
 
+/**
+ * Funzione ausiliaria che converte un array di bytes in un intero
+ *
+ * @param bytes --> L'array di bytes da convertire
+ */
 int bytes_to_int(unsigned char* bytes) {
 	int i;
 	int res = bytes[0];
