@@ -191,6 +191,10 @@ void load_acode(){
 								counter = pos = 0;
 								char c = *line;
 								while(c!='\0'){
+									if(counter>(strlen(line)-1)){
+										if(realloc(string, counter)==NULL)
+											abstract_machine_Error("Error allocating memory for given string");
+									}
 									if(c!='"'){
 										string[pos++]=c;
 									}
@@ -617,7 +621,7 @@ int pop_bool(){
  */
 void execute(Acode *instruction)
 {
-   	printf("istr: %d|%d - %s\n", pc+1,instruction->operator, s_op_code[instruction->operator]);
+	//printf("istr: %d|%d - %s\n", pc+1,instruction->operator, s_op_code[instruction->operator]);
 	// A seconda dell'operatore, chiamo la funzione che esegue la corrispondente istruzione
 	switch(instruction->operator)
 	{
