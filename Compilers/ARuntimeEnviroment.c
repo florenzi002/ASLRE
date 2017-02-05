@@ -20,11 +20,12 @@ int main(int argc, char *argv[]) {
 	program_file = argv[1];
 	Acode *instruction;
 	start_abstract_machine();
+	/**
+	 * Viene recuperata dal program counter l'istruzione successiva da eseguire. L'esecuzione procede finche'
+	 * non si incontra l'operatore HALT
+	 */
 	while((instruction = &program[pc++])->operator != HALT)
 		execute(instruction);
 	stop_abstract_machine(); // Esecuzione terminata, la macchina virtuale viene stoppata
 	return 0;
 }
-
-
-
