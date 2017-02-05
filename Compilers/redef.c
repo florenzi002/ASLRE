@@ -731,21 +731,21 @@ void execute_loda(int chain, int oid){
  * @param chain --> Distanza tra l'ambiente del chiamante e l'ambiente in cui la funzione e' definita
  */
 void execute_push(int num_formals_aux, int num_loc, int chain){
-	//printf("PUSH\n");
+	Arecord *dyn_ar = NULL;
+	if(ip>0)
+		dyn_ar = top_astack();
 	// Chiamo la funzione per allocare un nuovo Activation Record e aggiungerlo all'Activation Stack
 	Arecord *ar = push_activation_record();
+	ar->al=dyn_ar;
+	while((chain--)>0)
+		ar->al = ar->al->al;
 	//
 	ar->head = &ostack[op-num_formals_aux];
 	// Il numero di oggetti associati all'Activation Record e' dato dal numero dei locali + il numero dei parametri formali e ausiliari
 	ar->objects = num_loc+num_formals_aux;
 	// Il return address viene settato come program-counter+1
 	ar->retad = pc+1;
-	if(chain <= 0)
-		ar->al=NULL;
-	else if(chain == 0)
-		ar->al = astack[ap - 2];
-	else
-		ar->al = astack[ap-chain-1];
+
 }
 
 /**
@@ -1218,10 +1218,15 @@ void execute_apop(){
 	int i=0;
 	Orecord **start = top_astack()->head;
 	Orecord ** position = start;
+	//printf("IP0: %d\n", ip);
 	for(;i<top_astack()->objects; i++){
+		if((*position)->size!=ADDR && (*position)->type==VECTOR)
+			ip-=(*position)->size;
+		//printf("%s\t%s\n", (*position)->size==ADDR?"ADDR":"OBJ", (*position)->type==VECTOR?"VECTOR":"ATOMIC");
 		freemem((char*)*position, sizeof(Orecord));
 		position++;
 	}
+	//printf("IP1: %d\n", ip);
 	while(position!=&ostack[op]){
 		*start = *position;
 		start++;
