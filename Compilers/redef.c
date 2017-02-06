@@ -1124,31 +1124,33 @@ void execute_sind(int sizeof_elem){
  * Funzione che implementa l'operatore ISTO per effettuare l'indirect store
  */
 void execute_isto(){
-	// Recupero dall'Object Stack gli oggetti contenenti l'indirizzo e il valore da assegnare.
+	// Recupero dall'Object Stack gli oggetti contenenti l'indirizzo dell'oggetto da assegnare e l'oggetto da assegnare.
 	Orecord *obj = malloc(sizeof(Orecord));
 	*obj=*top_ostack();
 	pop_ostack();
 	Orecord* addr_descr = top_ostack();
 	unsigned char* bytes = malloc(sizeof(unsigned char)*(obj->size));
-	// Viene effettuato l'assegnamento del valore risultante dalla computazione di un'espressione
-	if(addr_descr->type==ATOM){
+	if(addr_descr->type==ATOM){ // Indirect store per un oggetto di tipo atomico
+		// Ottengo il puntatore alla memoria della destinazione
 		Orecord *dest = (Orecord*)addr_descr->instance.sval;
+		// Copio il campo instance dell'oggetto da assegnare nel campo instance dell'oggetto puntato dall'indirizzo
 		memcpy(&(dest->instance), &(obj->instance), obj->size);
 	}
-	else{
+	else{ // Indirect store per un oggetto di tipo strutturato
+		// Per oggetti di tipo atomico recupero il valore da assegnare dal campo instance
 		if(obj->type==ATOM){
 			memcpy(bytes, &(obj->instance), obj->size);
 			write_n_istack(bytes, obj->size, addr_descr->instance.ival);
-		}else{
+		}else{ // Per oggetti strutturati recupero il valore da assegnare dall'Instance stack
 			bytes = pop_n_istack(obj->size);
 			write_n_istack(bytes, obj->size,addr_descr->instance.ival);
 		}
 	}
+	// Rimuovo dall'Object stack l'indirizzo dell'oggetto da assegnare
 	pop_ostack();
 	free(obj);
 	free(bytes);
 }
-
 /**
  * Funzione che implementa l'operatore READ per lo statement di input
  *
