@@ -248,6 +248,9 @@ void start_abstract_machine()
  */
 void stop_abstract_machine()
 {
+	print_ostack();
+	printf("ObjectPointer: %d\n", op);
+
 	// Viene liberata la memoria allocata
 	freemem((char*) program, sizeof(Acode) * code_size);
 	freemem((char*) astack, sizeof(Arecord*) * asize);
@@ -768,14 +771,15 @@ void execute_loda(int chain, int oid){
  */
 void execute_push(int num_formals_aux, int num_loc, int chain){
 	Arecord *dyn_ar = NULL;
-	if(ip>0)
+	if(ap>0)
 		dyn_ar = top_astack();
 	// Chiamo la funzione per allocare un nuovo Activation Record e aggiungerlo all'Activation Stack
 	Arecord *ar = push_activation_record();
 	// In base al valore della catena, viene settato opportunamente l'access link
 	ar->al=dyn_ar;
-	while((chain--)>0)
-		ar->al = ar->al->al;
+	while((chain--)>0){
+		ar->al = (ar->al)->al;
+	}
 	// Il campo head del nuovo Activation Record punta al primo degli oggetti ad esso associati
 	ar->head = &ostack[op-num_formals_aux];
 	// Il numero di oggetti associati all'Activation Record e' dato dal numero dei locali + il numero dei parametri formali e ausiliari
@@ -1151,6 +1155,7 @@ void execute_isto(){
 	free(obj);
 	free(bytes);
 }
+
 /**
  * Funzione che implementa l'operatore READ per lo statement di input
  *
